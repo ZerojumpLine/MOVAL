@@ -13,7 +13,6 @@ demo_notebooks/
 *.ipynb
 *.svg
 *.mp4
-*.pkl
 
 ## gitignore for Python
 ## Source: https://raw.githubusercontent.com/github/gitignore/master/Python.gitignore
