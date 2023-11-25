@@ -2,18 +2,22 @@ from typing import Callable, Iterable, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 
-def cal_softmax(x, T = 1) -> np.ndarray:
+def cal_softmax(x, T = 1, e1 = 1e-6) -> np.ndarray:
     """Compute softmax values for each sets of scores in x.
     
     Args:
         x: The network output (logits) of shape ``(n, d)``.
         T: A scarlar temperature to calibrate the score.
+        e1: A small number to prevent unexpected results of division.
     
     Returns:
         prob: The calculated softmax probability for different classes of shape ``(n, d)``
 
     """
-    prob = np.exp(x.transpose() / T) / np.sum(np.exp(x.transpose() / T), axis=0)
+    # to avoid exponent exploding
+    x_max = np.max(x, keepdims=True, axis = 1).repeat(x.shape[1], axis=1)
+
+    prob = np.exp((x - x_max).transpose() / T) / (np.sum(np.exp((x - x_max).transpose() / T), axis=0) + e1)
 
     return prob.transpose()
 
@@ -29,8 +33,13 @@ def cal_energy(x, T = 1) -> np.ndarray:
     
     Returns:
         energy: The calculated energy of shape ``(n, )``
+    
+    Note:
+        We do not acutally utilize T to calibrate the model here, as the score is unbounded.
+        Instead, we utilize the model parameter to normalize the score.
 
     """
+    T = 1
     denominator = np.sum(np.exp(x.transpose() / T), axis=0)
     energy = - T * np.log(denominator)
 
@@ -52,7 +61,7 @@ def cal_mcp(x, T = 1) -> np.ndarray:
 
     return MCP
 
-def cal_entropy(x, T = 1) -> np.ndarray:
+def cal_entropy(x, T = 1, e1 = 1e-6) -> np.ndarray:
     """Compute entropy values for each sets of scores in x.
 
     Note:
@@ -61,6 +70,7 @@ def cal_entropy(x, T = 1) -> np.ndarray:
     Args:
         x: The network output (logits) of shape ``(n, d)``.
         T: A scarlar temperature to calibrate the score.
+        e1: A small number to prevent unexpected results of division.
     
     Returns:
         entropy: The calculated entropy of shape ``(n, )``
@@ -68,7 +78,7 @@ def cal_entropy(x, T = 1) -> np.ndarray:
     """
     num_class = x.shape[-1]
     p = cal_softmax(x, T = T)
-    entropy = - np.sum(p * np.emath.logn(num_class, p), axis=1)
+    entropy = - np.sum(p * np.emath.logn(num_class, p + e1), axis=1)
 
     return entropy
 
@@ -84,8 +94,13 @@ def cal_doctor(x, T = 1) -> np.ndarray:
     
     Returns:
         doctor: The calculated doctor of shape ``(n, )``
+    
+    Note:
+        We do not acutally utilize T to calibrate the model here, as the score is unbounded.
+        Instead, we utilize the model parameter to normalize the score.
 
     """
+    T = 1
     p = cal_softmax(x, T = T)
     g = np.sum(p ** 2, axis=1)
     doctor = (1 - g) / g

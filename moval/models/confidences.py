@@ -42,29 +42,11 @@ class Confidence(abc.ABC):
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
     
-    def reshape_T(self, T: Union[type(None), np.ndarray], num_class: int) -> np.ndarray:
-        """Reshape T from arbitrary shape to ``(d, )``.
-
-        Args:
-            T: Temperature to calibrate the confidence scores of type None, shape ``(d, )`` or a numpy float.
-            num_class: the number of class for the logit.
-        
-        Returns:
-            T: Reshaped T of shape ``(d, )``.
-        
-        """
-        if T is None:
-            T = np.ones(num_class)
-        if len(T) == 1:
-            T = T.repeat(num_class)
-        
-        return T
-    
     def reshape_inp(self, inp: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Reshape the input from arbitrary shape to ``(n, d)``.
 
         Args:
-            inp: The network output (logits) of shape ``(n, d, (H), (W), (D))``.
+            inp: The network output (logits) of shape ``(n, d, H, W, (D))``.
         
         Returns:
             inp: Reshaped network output of shape ``(n, d)``.
@@ -74,50 +56,82 @@ class Confidence(abc.ABC):
         
         inp_shape = inp.shape
 
-        if len(inp_shape) > 2:
-            # flaten the logit for segmentation.
-            # first tranpose the feature to the last dimension
-            axes = [0] + list(range(2, len(inp_shape))) + [1]
-            inp = np.transpose(inp, axes)
-            # then flatten all
-            inp = inp.reshape((-1,) + inp.shape[-1:])
+        # flaten the logit for segmentation.
+        # first tranpose the feature to the last dimension
+        axes = [0] + list(range(2, len(inp_shape))) + [1]
+        inp = np.transpose(inp, axes)
+        # then flatten all
+        inp = inp.reshape((-1,) + inp.shape[-1:])
         
         return inp, inp_shape
     
-    def __call__(self, inp: np.ndarray, T: np.ndarray = None) -> np.ndarray:
+    def __call__(self, inp: Union[List[Iterable], np.ndarray], T: np.ndarray = None) -> Union[List[Iterable], np.ndarray]:
         """Calculate softmax probability and return the maximum.
 
         Args:
-            inp: The network output (logits) of shape ``(n, d, (H), (W), (D))``.
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
             T: Tempratature to calibrate the confidence scores of shape ``(d, )`` for class-specific or ``(1, )`` for class-agnostic.
                 If it is omited as None, the scores are not calibrated (T = 1).
         
         Return:
-            conf_score: The calculated confidence scores, of shape ``(n, (H), (W), (D))``.
+            conf_score: The calculated confidence scores, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
         
         """
 
         num_class = inp.shape[1]
-        T = self.reshape_T(T, num_class=num_class)
-        # now T is of shape ``(d, )``
+        if T is None:
+            T = np.ones(num_class)
         
-        inp, inp_shape = self.reshape_inp(inp)
-        # now inp is of shape ``(n, d)``
+        if isinstance(inp, list):
+            # inp is a list, segmentaiton task
 
-        pred = np.argmax(inp, axis=1)
-        conf_score = np.zeros(inp.shape[0]) # ``(n, )``
-        for kcls in range(num_class):
-            pred_cls_position,  = np.where(pred == kcls)
-            conf_score[pred_cls_position] = self.cal_func(inp[pred_cls_position, :], T[kcls])
+            conf_scores = []
 
-        if self.negative_score:
-            conf_score = 1 - conf_score
+            for n_case in len(inp):
 
-        if len(inp_shape) > 2:
-            # transfer back to the original dimension
-            conf_score = conf_score.reshape(inp_shape[:1] + inp_shape[2:])
+                inp_case = inp[n_case]
+                inp_case = inp_case[np.newaxis, ...]
 
-        return conf_score
+                inp_case, inp_shape = self.reshape_inp(inp_case)
+                # now inp_case is of shape ``(n, d)``
+
+                pred = np.argmax(inp_case, axis=1)
+                conf_score = np.zeros(inp_case.shape[0]) # ``(n, )``
+                
+                if len(T) == 1:
+                    conf_score = self.cal_func(inp_case, T)
+                else:
+                    for kcls in range(num_class):
+                        pred_cls_position,  = np.where(pred == kcls)
+                        conf_score[pred_cls_position] = self.cal_func(inp_case[pred_cls_position, :], T[kcls])
+
+                if self.negative_score:
+                    conf_score = 1 - conf_score
+
+                # transfer back to the original dimension
+                conf_score = conf_score.reshape(inp_shape[:1] + inp_shape[2:]) # ``(1, H, W, (D))``
+            
+                conf_scores.append(conf_score[0])
+
+            return conf_scores
+
+        else:
+            # inp is not a list, classification task
+
+            pred = np.argmax(inp, axis=1)
+            conf_score = np.zeros(inp.shape[0]) # ``(n, )``
+            
+            if len(T) == 1:
+                conf_score = self.cal_func(inp, T)
+            else:
+                for kcls in range(num_class):
+                    pred_cls_position,  = np.where(pred == kcls)
+                    conf_score[pred_cls_position] = self.cal_func(inp[pred_cls_position, :], T[kcls])
+
+            if self.negative_score:
+                conf_score = 1 - conf_score
+
+            return conf_score
 
 @register("max_class_probability-conf")
 class maxclassprobabilityConfidence(Confidence):
@@ -156,7 +170,7 @@ class energyConfidence(Confidence):
 
 # entropy
 @register("entropy-conf")
-class energyConfidence(Confidence):
+class entropyConfidence(Confidence):
     """Confidence scores based on entropy.
     
     Note:
@@ -176,7 +190,7 @@ class energyConfidence(Confidence):
 # doctor scores
 @register("doctor-conf")
 class doctorConfidence(Confidence):
-    """MOVAL model with average confidence."""
+    """MOVAL model with doctor confidence."""
 
     def __init__(self):
         super().__init__(

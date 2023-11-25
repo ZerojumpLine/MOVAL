@@ -1,4 +1,5 @@
 import abc
+from typing import Callable, Iterable, List, Literal, Optional, Tuple, Union
 import numpy as np
 from typing import Any
 from moval.models import register
@@ -70,13 +71,14 @@ class Model(abc.ABC):
         self.extend_param = extend_param
 
         self.conf = moval.models.init(self.confidence_scores)
-
-        if self.conf.normalization:
-            self.max_value = 0.
-            self.min_value = 0.
         
         self.is_training = False
         
+        # Note, for non-normalized method, we choose the parameter as the lower bound for normalization.
+        if self.conf.normalization:
+            self.max_value = 0.
+            self.min_value = 0.
+
         if self.class_specific:
             self.param = np.ones(num_class)
         else:
@@ -99,11 +101,11 @@ class Model(abc.ABC):
         """
         self.is_training = False
 
-    def _find_normalize(self, scores: np.ndarray):
+    def _find_normalize(self, scores: Union[List[Iterable], np.ndarray]):
         """Find the normalization parameter for the confidence scores.
 
         Args:
-            scores: The unbounded confidence scores, of shape ``(n, (H), (W), (D))``.
+            scores: The unbounded confidence scores, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
 
         Notes:
             The intensity value, max and min value, will be saved.
@@ -113,33 +115,92 @@ class Model(abc.ABC):
         self.max_value = np.max(scores)
         self.min_value = np.min(scores)
 
-    def _normalize(self, scores: np.ndarray, e1: float = 1e-6) -> np.ndarray:
-        """Normalize the confidence scores to [0,1] if the score is not bounded.
+    def _normalize(self, scores: Union[List[Iterable], np.ndarray], lb: np.ndarray = None, pred: np.ndarray = None, e1: float = 1e-6) -> Union[List[Iterable], np.ndarray]:
+        """Normalize the confidence scores to [(1-self.param), 1] if the score is not bounded.
+
+        Note:
+            This replace the temperature scaling process of this confidence scores, e.g., doctor, energy.
 
         Args:
-            scores: The unbounded confidence scores, of shape ``(n, (H), (W), (D))``.
+            scores: The unbounded confidence scores, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
             e1: A small number to prevent unexpected results of division.
+            lb: Lower bound of scores to calibrate the confidence scores of shape ``(d, )`` for class-specific or ``(1, )`` for class-agnostic.
+                If it is omited as None, the scores are normalized to [0, 1] (lb = 0).
+            pred: The prediction derived from the logits, of shape ``(n, )`` or a list of n ``(H, W, (D))``, used for class-specific operation.
         
         Returns:
-            normalized_scores: The normalized confidence scores, of shape ``(n, (H), (W), (D))``.
+            normalized_scores: The normalized confidence scores, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
         
         """
 
         if self.is_training:
             self._find_normalize(scores)
 
-        if self.conf.normalization:
-            normalized_scores = (scores - self.min_value) / (self.max_value - self.min_value + e1)
-            return normalized_scores
-        
+        if isinstance(scores, list):
+            
+            _normalized_scores = []
+            for n_case in len(scores):
+                _normalized_scores.append( (scores[n_case] - self.min_value) / (self.max_value - self.min_value + e1) )
+
+            if lb is None:
+                return _normalized_scores
+            
+            else:
+
+                normalized_scores = []
+
+                for n_case in len(_normalized_scores):
+
+                    # reshape normalized_scores, pred to vectors.
+                    inp_shape = _normalized_scores[n_case].shape
+
+                    # flaten the logit for segmentation.
+                    normalized_score = normalized_scores[n_case].reshape((-1))
+                    pred_case = pred[n_case].reshape((-1))
+
+                    # normalized_scores now is of shape ``(n, )``
+                    # pred now is of shape ``(n, )``
+
+                    if not self.class_specific:
+                        normalized_score = normalized_score * self.param + (1 - self.param)
+                    else:
+                        # class-wise average confidence
+                        for kcls in range(self.num_class):
+                            pos_cls = np.where(pred_case == kcls)[0]
+                            normalized_score[pos_cls] = normalized_score[pos_cls] * self.param[kcls] + (1 - self.param[kcls])
+                    
+                    normalized_score = normalized_score.reshape(inp_shape)
+
+                    normalized_scores.append(normalized_score)
+
+                return normalized_scores
+
         else:
-            return scores
+
+            normalized_scores = (scores - self.min_value) / (self.max_value - self.min_value + e1)
+
+            if lb is None:
+                return normalized_scores
+            else:
+                # normalized_scores now is of shape ``(n, )``
+                # pred now is of shape ``(n, )``
+
+                if not self.class_specific:
+                    normalized_scores = normalized_scores * self.param + (1 - self.param)
+                else:
+                    # class-wise average confidence
+                    for kcls in range(self.num_class):
+                        pos_cls = np.where(pred == kcls)[0]
+                        normalized_scores[pos_cls] = normalized_scores[pos_cls] * self.param[kcls] + (1 - self.param[kcls])
+
+                return normalized_scores
     
-    def __call__(self, inp: np.ndarray) -> float:
+    def __call__(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> float:
         """Calculate the performance using network output.
 
         Args:
-            inp: The network output (logits) of shape ``(n, d, (H), (W), (D))``.
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            midstage: If ``True``, return the first calibrated results.
         
         Returns:
             estim_acc: A float scalar that represents the estimated accuracy for the given input data.
@@ -150,7 +211,10 @@ class Model(abc.ABC):
         """
 
         # calibrate the confidence scores
-        score = self.calibrate(inp)
+        if self.extend_param:
+            score = self.calibrate(inp, midstage)
+        else:
+            score = self.calibrate(inp)
 
         # Estimate the performance.
         if self.mode == "classification":
@@ -166,26 +230,40 @@ class Model(abc.ABC):
             return estim_acc, np.array(estim_acc_allcls)
         elif self.mode == "segmentation":
             # for segmentation tasks, return average confidence for background class (c=0), and return the soft dsc for other foreground classes.
-            pred = np.argmax(inp, axis = 1)
-            pred_flatten = pred.flatten()
-            score_flatten = score.flatten()
-            score_flatten_bg = score_flatten[np.where(pred_flatten == 0)[0]]
-            estim_acc = np.mean(score_flatten)
-            estim_acc_bg = np.mean(score_flatten_bg)
+            scores = []
+            scores_bg = []
+            for n_case in len(inp):
+                pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
+                pred_flatten = pred_case.flatten() # ``n``
+                score_flatten = score[n_case].flatten() # ``n``
+                score_flatten_bg = score_flatten[np.where(pred_flatten == 0)[0]]
+                scores.append(score_flatten)
+                scores_bg.append(score_flatten_bg)
+
+            estim_acc = np.mean( np.concatenate(score_flatten) )
+            estim_acc_bg = np.mean( np.concatenate(score_flatten_bg) )
+            
             # Note, the calculation of dice score need the probability of non-maximum classes 
             # here we extend score from shape ``(n, H, W, (D))`` to ``(n, d, H, W, (D))``, the other dimension are just filled with zeros
-            score_filled = np.zeros((pred_flatten.shape[-1], inp.shape[1])) # ``(n * H * W * (D), d)``
-            score_filled[np.arange(score_filled.shape[0]), pred_flatten] = score_flatten
-            score_filled = score_filled.reshape(inp.shape[:1] + inp.shape[2:] + inp.shape[1:2]) # ``(n, H, W, (D), d)``
-            axes = [0] + [len(score_filled.shape)-1] + list(range(1, len(score_filled.shape)-1))
-            score_filled = np.transpose(score_filled, axes) # ``(n, d, H, W, (D))``
-            #
-            estim_dsc = SoftDiceLoss(score_filled, pred)
-            return estim_acc, np.concatenate([np.array([estim_acc_bg]), estim_dsc[1:]])
+            estim_dsc_list = []
+            for n_case in len(inp):
+                pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
+                pred_flatten = pred_case.flatten() # ``n``
+                score_case = score[n_case] # ``(H, W, (D))``
+                score_flatten = score[n_case].flatten() # ``n``
+                score_filled = np.zeros(((self.num_class,), score_flatten.shape)) # ``(d, n)``
+                score_filled[pred_flatten, np.arange(score_filled.shape[0])] = score_flatten # ``(d, n)``
+                score_filled = score_filled.reshape(((self.num_class,), score_case.shape)) # ``(d, H, W, (D))``
+                #
+                estim_dsc = SoftDiceLoss(score_filled[np.newaxis, ...], pred_case[np.newaxis, ...])
+                estim_dsc_list.append(estim_dsc)
+            m_estim_dsc = np.mean(np.array(estim_dsc_list), axis=0)
+            
+            return estim_acc, np.concatenate([np.array([estim_acc_bg]), m_estim_dsc[1:]])
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
 
-    def calibrate(self, scores: np.ndarray) -> np.ndarray:
+    def calibrate(self, scores: Union[List[Iterable], np.ndarray]) -> Union[List[Iterable], np.ndarray]:
         """Calibrate the confidence scores with parameters.
 
         Different estimation algorithms would adopt different strateiges to calibrate the scores.
@@ -212,22 +290,23 @@ class acModel(Model):
             extend_param = False
         )
     
-    def calibrate(self, inp: np.ndarray) -> np.ndarray:
+    def calibrate(self, inp: Union[List[Iterable], np.ndarray]) -> Union[List[Iterable], np.ndarray]:
         """Calibrate the confidence scores for average confidence.
         
         Args:
-            inp: The network output (logits) of shape ``(n, d, (H), (W), (D))``.
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
 
         Returns:
-            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, (H), (W), (D))``.
+            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
 
         """
 
         # Calualte the confidence socres.
-        score = self.conf(inp) # `(n,)` for classification or `(n, H, W, (D))` for segmentation
+        score = self.conf(inp) # ``(n,)`` for classification or a list of n ``(H, W, (D))`` for segmentation
 
         # Normalize the scores, if needed.
-        score = self._normalize(score)
+        if self.conf.normalization:
+            score = self._normalize(score)
         
         return score
 
@@ -245,22 +324,33 @@ class tsModel(Model):
             extend_param = False
         )
     
-    def calibrate(self, inp: np.ndarray) -> np.ndarray:
+    def calibrate(self, inp: Union[List[Iterable], np.ndarray]) -> Union[List[Iterable], np.ndarray]:
         """Calibrate the confidence scores with temperature scaling.
 
         Args:
-            inp: The network output (logits) of shape ``(n, d, (H), (W), (D))``.
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
 
         Returns:
-            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, (H), (W), (D))``.
+            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
         
         """
 
         # Calualte the confidence socres.
-        score = self.conf(inp, self.param) # `(n,)` for classification or `(n, H, W, (D))` for segmentation
+        score = self.conf(inp, self.param) # ``(n,)`` for classification or a list of n ``(H, W, (D))`` for segmentation
 
         # Normalize the scores, if needed.
-        score = self._normalize(score)
+        if self.conf.normalization:
+            if self.mode == "classification":
+                pred = np.argmax(inp, axis = 1)
+                score = self._normalize(score, lb = self.param, pred = pred)
+            elif self.mode == "segmentation":
+                preds = []
+                for n_case in len(score):
+                    pred_case = np.argmax(inp[n_case], axis = 0)
+                    preds.append(pred_case)
+                score = self._normalize(score, lb = self.param, pred = preds)
+            else:
+                raise ValueError(f"Unknown mode '{self.mode}'")
         
         return score
 
@@ -278,14 +368,14 @@ class docModel(Model):
             extend_param = False
         )
     
-    def calibrate(self, inp: np.ndarray) -> np.ndarray:
+    def calibrate(self, inp: Union[List[Iterable], np.ndarray]) -> Union[List[Iterable], np.ndarray]:
         """Calibrate the confidence scores based on difference of confidence.
 
         Args:
-            inp: The network output (logits) of shape ``(n, d, (H), (W), (D))``.
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
 
         Returns:
-            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, (H), (W), (D))``.
+            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
         
         Note:
             The implementation of class-specific DoC for segmentation is different from what we did in our MICCAI work.
@@ -295,32 +385,48 @@ class docModel(Model):
         """
 
         # Calualte the confidence socres.
-        score = self.conf(inp) # `(n,)` for classification or `(n, H, W, (D))` for segmentation
+        score = self.conf(inp) # ``(n,)`` for classification or a list of n ``(H, W, (D))`` for segmentation
+
+        # Normalize the scores, if needed.
+        if self.conf.normalization:
+            score = self._normalize(score)
 
         if not self.class_specific:
-            score = score - (1 - self.param)
+            if self.mode == "classification":
+                return score - (1 - self.param)
+            elif self.mode == "segmentation":
+                score_post = []
+                for n_case in len(score):
+                    score_case = score[n_case] - (1 - self.param)
+                    score_post.append(score_case)
+                return score_post
+            else:
+                raise ValueError(f"Unknown mode '{self.mode}'")
         else:
             # class-wise average confidence
-            pred = np.argmax(inp, axis = 1)
             if self.mode == "classification":
+                pred = np.argmax(inp, axis = 1)
                 for kcls in range(inp.shape[1]):
                     pos_cls = np.where(pred == kcls)[0]
                     score[pos_cls] = score[pos_cls] - (1 - self.param[kcls])
+                return score
             elif self.mode == "segmentation":
-                pred_flatten = pred.flatten()
-                score_flatten = score.flatten()
-                #
-                for kcls in range(inp.shape[1]):
-                    pos_flatten_cls = np.where(pred_flatten == kcls)[0]
-                    score_flatten[pos_flatten_cls] = score_flatten[pos_flatten_cls] - (1 - self.param[kcls])
-                    score = score_flatten.reshape(inp.shape[:1] + inp.shape[2:]) # ``(n, H, W, (D))``
+                score_post = []
+                for n_case in len(score):
+                    score_case = score[n_case] # ``(H, W, (D))``
+                    pred_case = np.argmax(inp[n_case], axis = 0)
+                    score_shape = score_case.shape
+                    score_flatten = score_case.flatten()
+                    pred_flatten = pred_case.flatten()
+                    #
+                    for kcls in range(self.num_class):
+                        pos_flatten_cls = np.where(pred_flatten == kcls)[0]
+                        score_flatten[pos_flatten_cls] = score_flatten[pos_flatten_cls] - (1 - self.param[kcls])
+                        score_reshape = score_flatten.reshape(score_shape) # ``(H, W, (D))``
+                    score_post.append(score_reshape)
+                return score_post
             else:
                 raise ValueError(f"Unknown mode '{self.mode}'")
-        
-        # Normalize the scores, if needed.
-        score = self._normalize(score)
-        
-        return score
 
 @register("atc-model")
 class atcModel(Model):
@@ -336,45 +442,69 @@ class atcModel(Model):
             extend_param = False
         )
 
-    def calibrate(self, inp: np.ndarray) -> np.ndarray:
+    def calibrate(self, inp: Union[List[Iterable], np.ndarray]) -> Union[List[Iterable], np.ndarray]:
         """Calibrate the confidence scores based on average thresholded confidence.
 
         Args:
-            inp: The network output (logits) of shape ``(n, d, (H), (W), (D))``.
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
 
         Returns:
-            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, (H), (W), (D))``.
+            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
         
         """
 
         # Calualte the confidence socres.
-        _score = self.conf(inp) # `(n,)` for classification or `(n, H, W, (D))` for segmentation
+        _score = self.conf(inp) # ``(n,)`` for classification or a list of n ``(H, W, (D))`` for segmentation
 
-        score = np.zeros((inp.shape[:1] + inp.shape[2:]))
+        # Normalize the scores, if needed.
+        if self.conf.normalization:
+            _score = self._normalize(_score)
+
         if not self.class_specific:
-            score[_score > self.param] = 1
-        else:
-            # class-wise average confidence
-            pred = np.argmax(inp, axis = 1)
             if self.mode == "classification":
-                for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(pred == kcls)[0]
-                    score[pos_cls][_score[pos_cls] > self.param[kcls]] = 1
+                score = np.zeros(inp.shape[0])
+                score[_score > self.param] = 1
+                return score
             elif self.mode == "segmentation":
-                pred_flatten = pred.flatten()
-                score_flatten = score.flatten()
-                _score_flatten = _score.flatten()
-                #
-                for kcls in range(inp.shape[1]):
-                    pos_flatten_cls = np.where(pred_flatten == kcls)[0]
-                    score_flatten[pos_flatten_cls][_score_flatten[pos_flatten_cls] > self.param[kcls]] = 1
-                    score = score_flatten.reshape(inp.shape[:1] + inp.shape[2:]) # ``(n, H, W, (D))``
+                score_post = []
+                for n_case in len(_score):
+                    score = np.zeros(_score[n_case].shape)
+                    score[_score[n_case] > self.param] = 1
+                    score_post.append(score)
+                return score_post
             else:
                 raise ValueError(f"Unknown mode '{self.mode}'")
-        
-        score = self._normalize(score)
-        
-        return score
+        else:
+            # class-wise average confidence
+            if self.mode == "classification":
+                pred = np.argmax(inp, axis = 1)
+                for kcls in range(inp.shape[1]):
+                    pos_cls = np.where(pred == kcls)[0]
+                    score_pos = score[pos_cls]
+                    score_pos[_score[pos_cls] > self.param[kcls]] = 1
+                    score[pos_cls] = score_pos
+                return score
+            elif self.mode == "segmentation":
+                score_post = []
+                for n_case in len(_score):
+                    _score_case = _score[n_case] # ``(H, W, (D))``
+                    score_case = np.zeros(_score[n_case])
+                    pred_case = np.argmax(inp[n_case], axis = 0)
+                    score_shape = score_case.shape
+                    pred_flatten = pred_case.flatten()
+                    score_flatten = score_case.flatten()
+                    _score_flatten = _score_case.flatten()
+                    #
+                    for kcls in range(self.num_class):
+                        pos_flatten_cls = np.where(pred_flatten == kcls)[0]
+                        score_pos = score_flatten[pos_flatten_cls]
+                        score_pos[_score_flatten[pos_flatten_cls] > self.param[kcls]] = 1
+                        score_flatten[pos_flatten_cls] = score_pos
+                        score_reshape = score_flatten.reshape(score_shape) # ``(H, W, (D))``
+                    score_post.append(score_reshape)
+                return score_post
+            else:
+                raise ValueError(f"Unknown mode '{self.mode}'")
 
 @register("ts-atc-model")
 class tsatcModel(Model):
@@ -390,43 +520,82 @@ class tsatcModel(Model):
             extend_param = True
         )
     
-    def calibrate(self, inp: np.ndarray) -> np.ndarray:
+    def calibrate(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> Union[List[Iterable], np.ndarray]:
         """Calibrate the confidence scores based on average thresholded confidence after temperature scaling.
 
         Args:
-            inp: The network output (logits) of shape ``(n, d, (H), (W), (D))``.
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            midstage: If ``True``, return the first calibrated results.
 
         Returns:
-            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, (H), (W), (D))``.
+            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
         
         """
 
         # Calualte the confidence socres.
-        _score = self.conf(inp, self.param) # `(n,)` for classification or `(n, H, W, (D))` for segmentation
-
-        score = np.zeros((inp.shape[:1] + inp.shape[2:]))
-        if not self.class_specific:
-            score[_score > self.param_ext] = 1
-        else:            
-            # class-wise average confidence
-            pred = np.argmax(inp, axis = 1)
-            if self.mode == "classification":
-                for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(pred == kcls)[0]
-                    score[pos_cls][_score[pos_cls] > self.param[kcls]] = 1
-            elif self.mode == "segmentation":
-                pred_flatten = pred.flatten()
-                score_flatten = score.flatten()
-                _score_flatten = _score.flatten()
-                #
-                for kcls in range(inp.shape[1]):
-                    pos_flatten_cls = np.where(pred_flatten == kcls)[0]
-                    score_flatten[pos_flatten_cls][_score_flatten[pos_flatten_cls] > self.param[kcls]] = 1
-                    score = score_flatten.reshape(inp.shape[:1] + inp.shape[2:]) # ``(n, H, W, (D))``
-            else:
-                raise ValueError(f"Unknown mode '{self.mode}'")
+        _score = self.conf(inp, self.param) # ``(n,)`` for classification or a list of n ``(H, W, (D))`` for segmentation
         
         # Normalize the scores, if needed.
-        score = self._normalize(score)
+        if self.conf.normalization:
+            if self.mode == "classification":
+                pred = np.argmax(inp, axis = 1)
+                _score = self._normalize(_score, lb = self.param, pred = pred)
+            elif self.mode == "segmentation":
+                preds = []
+                for n_case in len(_score):
+                    pred_case = np.argmax(inp[n_case], axis = 0)
+                    preds.append(pred_case)
+                _score = self._normalize(_score, lb = self.param, pred = preds)
+            else:
+                raise ValueError(f"Unknown mode '{self.mode}'") 
+
+        if midstage:
+            return _score
+
+        if not self.class_specific:
+            if self.mode == "classification":
+                score = np.zeros(inp.shape[0])
+                score[_score > self.param] = 1
+                return score
+            elif self.mode == "segmentation":
+                score_post = []
+                for n_case in len(_score):
+                    score = np.zeros(_score[n_case].shape)
+                    score[_score[n_case] > self.param] = 1
+                    score_post.append(score)
+                return score_post
+            else:
+                raise ValueError(f"Unknown mode '{self.mode}'")
+        else:
+            # class-wise average confidence
+            if self.mode == "classification":
+                pred = np.argmax(inp, axis = 1)
+                for kcls in range(inp.shape[1]):
+                    pos_cls = np.where(pred == kcls)[0]
+                    score_pos = score[pos_cls]
+                    score_pos[_score[pos_cls] > self.param_ext[kcls]] = 1
+                    score[pos_cls] = score_pos
+                return score
+            elif self.mode == "segmentation":
+                score_post = []
+                for n_case in len(_score):
+                    _score_case = _score[n_case] # ``(H, W, (D))``
+                    score_case = np.zeros(_score[n_case])
+                    pred_case = np.argmax(inp[n_case], axis = 0)
+                    score_shape = score_case.shape
+                    pred_flatten = pred_case.flatten()
+                    score_flatten = score_case.flatten()
+                    _score_flatten = _score_case.flatten()
+                    #
+                    for kcls in range(self.num_class):
+                        pos_flatten_cls = np.where(pred_flatten == kcls)[0]
+                        score_pos = score_flatten[pos_flatten_cls]
+                        score_pos[_score_flatten[pos_flatten_cls] > self.param_ext[kcls]] = 1
+                        score_flatten[pos_flatten_cls] = score_pos
+                        score_reshape = score_flatten.reshape(score_shape) # ``(H, W, (D))``
+                    score_post.append(score_reshape)
+                return score_post
+            else:
+                raise ValueError(f"Unknown mode '{self.mode}'")
 
         return score

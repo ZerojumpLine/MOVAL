@@ -49,14 +49,14 @@ class MOVAL(BaseEstimator):
 
     def fit(
         self,
-        logits: np.ndarray,
-        gt: np.ndarray
+        logits: Union[List[Iterable], np.ndarray],
+        gt: Union[List[Iterable], np.ndarray]
     ) -> "MOVAL":
         """Fit the estimator to the given dataset by minimzing the calibration error.
 
         Args:
-            inp: The network output (logits) of shape ``(n, d)`` for classification and ``(n, d, H, W, (D))`` for segmentation. 
-            gt: The cooresponding annotation of shape ``(n, )`` for classification and ``(n, H, W, (D))`` for segmentation
+            inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
+            gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation
         
         Return:
             ``self``
@@ -84,29 +84,42 @@ class MOVAL(BaseEstimator):
         solver = moval.solvers.init("base-solver", model = model)
 
         # Input validation
-        if logits.shape[0] != gt.shape[0]:
-            raise ValueError(
-                    f"Invalid input samples: logits and GT should represent the same number of samples"
-                    f"(n_samples of logits, {logits.shape[0]}, while n_samples of GT , {gt.shape[0]})."
-                )
+        if self.modee == "classification":
+            if logits.shape[0] != gt.shape[0]:
+                raise ValueError(
+                        f"Invalid input samples: logits and GT should represent the same number of samples"
+                        f"(n_samples of logits, {logits.shape[0]}, while n_samples of GT , {gt.shape[0]})."
+                    )
 
-        if len(logits.shape) != (len(gt.shape) + 1):
-            raise ValueError(
-                    f"Invalid input dimension: logits should have one additional dimension than GT"
-                    f"(dimension of logits, {len(logits.shape)}, while dimension of GT , {len(gt.shape)})."
-                )
-
-        if self.mode == "classification":
+            if len(logits.shape) != (len(gt.shape) + 1):
+                raise ValueError(
+                        f"Invalid input dimension: logits should have one additional dimension than GT"
+                        f"(dimension of logits, {len(logits.shape)}, while dimension of GT , {len(gt.shape)})."
+                    )
+            
             if len(gt.shape) != 1:
                 raise ValueError(
                     f"Invalid input dimension for classification: GT should have the dimension of 1"
                     f"(dimension of GT, {len(logits.shape)})."
                 )
+
         else:
-            if (len(gt.shape) != 3) or (len(gt.shape) != 4):
+            if len(logits) != len(gt):
                 raise ValueError(
-                    f"Invalid input dimension for segmentation: GT should have the dimension of 3 or 4"
-                    f"(dimension of GT, {len(logits.shape)})."
+                        f"Invalid input samples: logits and GT should represent the same number of samples"
+                        f"(n_samples of logits, {len(logits)}, while n_samples of GT , {len(gt)})."
+                    )
+
+            if len(logits[0].shape) != (len(gt[0].shape) + 1):
+                raise ValueError(
+                        f"Invalid input dimension: logits should have one additional dimension than GT"
+                        f"(dimension of logits, {len(logits[0].shape)}, while dimension of GT , {len(gt[0].shape)})."
+                    )
+            
+            if (len(gt[0].shape) != 2) or (len(gt[0].shape) != 3):
+                raise ValueError(
+                    f"Invalid input dimension for segmentation: GT should have the dimension of 2 or 3"
+                    f"(dimension of GT, {len(logits[0].shape)})."
                 )
 
         solver.fit(logits, gt)
@@ -119,11 +132,11 @@ class MOVAL(BaseEstimator):
         return self
     
     def estimate(self,
-                 logits: np.ndarray):
+                 logits: Union[List[Iterable], np.ndarray]):
         """Estimate model performance using logits.
 
         Args:
-            logits: A numpy array of size ``(n, d)`` for classification or ``(n, d, H, W, (D))`` for segmentation.
+            logits: A numpy array of size ``(n, d)`` for classification or a list of n ``(d, H, W, (D))`` for segmentation.
         
         Returns:
             estim: estimated accuracy (float) for classification tasks, 

@@ -39,7 +39,7 @@ def test_solver(estim_algorithm, mode, numclass, confidence_scores, class_specif
     assert isinstance(solver, moval.solvers.Solver)
 
     if mode == "classification":
-        inp = np.random.randn(100, numclass) # 100 samples, 10 classes
+        inp = np.random.randn(100, numclass) # 100 samples, 3 classes
         gt = np.random.randint(0, numclass, (100, ))
         _estim_acc, _estim_acc_allcls = model(inp)
         #
