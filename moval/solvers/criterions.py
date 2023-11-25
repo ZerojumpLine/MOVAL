@@ -94,7 +94,7 @@ class segCalibrate(Calibrate):
         if not self.class_specific:
             
             err_all = []
-            for n_case in len(inp):
+            for n_case in range(len(inp)):
 
                 pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                 gt_case     = gt[n_case] # ``(H, W, (D))``
@@ -105,7 +105,7 @@ class segCalibrate(Calibrate):
         else:
             
             err_all = []
-            for n_case in len(inp):
+            for n_case in range(len(inp)):
 
                 pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                 gt_case     = gt[n_case] # ``(H, W, (D))``
@@ -119,6 +119,6 @@ class segCalibrate(Calibrate):
                     err[kcls] = estim[kcls] - ComputMetric(pred_case == kcls, gt_case == kcls)
                 err_all.append(err)
 
-        m_err = np.mean(np.array(err_all))
+        m_err = np.mean(np.array(err_all), axis=0)
 
         return np.abs(m_err)

@@ -46,7 +46,9 @@ def test_model(estim_algorithm, mode, numclass, confidence_scores, class_specifi
     
     if mode == "segmentation":
         # segmentation logit input
-        inp = np.random.randn(5, numclass, 50, 50, 50) # 5 samples, of volume shape ``(50, 50, 50)``
+        inp = []
+        for _ in range(5):
+            inp.append(np.random.randn(numclass, 50, 50, 50)) # 10 samples, 3 classes, of volume shape ``(100, 100, 100)``
         estim_acc, estim_dsc = model(inp)
         assert estim_acc <= 1 and estim_acc >= 0
         assert len(estim_dsc) == numclass

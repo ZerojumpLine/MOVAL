@@ -73,7 +73,11 @@ class MOVAL(BaseEstimator):
         """
 
         # initilization
-        self.numclass = logits.shape[-1]
+        if isinstance(logits, list):
+            self.numclass = logits[0].shape[-1]
+        else:
+            self.numclass = logits.shape[-1]
+
         model = moval.models.init(
             self.estim_algorithm,
             mode = self.mode,
@@ -84,7 +88,7 @@ class MOVAL(BaseEstimator):
         solver = moval.solvers.init("base-solver", model = model)
 
         # Input validation
-        if self.modee == "classification":
+        if self.mode == "classification":
             if logits.shape[0] != gt.shape[0]:
                 raise ValueError(
                         f"Invalid input samples: logits and GT should represent the same number of samples"
@@ -116,10 +120,10 @@ class MOVAL(BaseEstimator):
                         f"(dimension of logits, {len(logits[0].shape)}, while dimension of GT , {len(gt[0].shape)})."
                     )
             
-            if (len(gt[0].shape) != 2) or (len(gt[0].shape) != 3):
+            if (len(gt[0].shape) != 2) and (len(gt[0].shape) != 3):
                 raise ValueError(
                     f"Invalid input dimension for segmentation: GT should have the dimension of 2 or 3"
-                    f"(dimension of GT, {len(logits[0].shape)})."
+                    f"(dimension of GT, {len(gt[0].shape)})."
                 )
 
         solver.fit(logits, gt)

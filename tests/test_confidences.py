@@ -32,10 +32,12 @@ def test_conf(confidence_scores):
     # should be more confidence!
 
     # segmentation logit input
-    inp = np.random.randn(10, 3, 100, 100, 100) # 10 samples, 3 classes, of volume shape ``(100, 100, 100)``
+    inp = []
+    for _ in range(10):
+        inp.append(np.random.randn(3, 100, 100, 100)) # 10 samples, 3 classes, of volume shape ``(100, 100, 100)``
     score = conf(inp)
-    assert isinstance(score, np.ndarray)
-    assert score.shape == (10, 100, 100, 100)
+    assert isinstance(score, list)
+    assert score[0].shape == (100, 100, 100)
 
     if not conf.normalization:
         assert np.max(score) <= 1

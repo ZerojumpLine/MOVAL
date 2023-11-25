@@ -38,8 +38,11 @@ def test_seg_criterions(class_specific):
 
     # segmentation logit input
     numclass = 3
-    inp = np.random.randn(10, numclass, 100, 100, 100) # 10 samples, 3 classes, of volume shape ``(100, 100, 100)``
-    gt = np.random.randint(0, numclass, (10, 100, 100, 100))
+    inp = []
+    gt = []
+    for _ in range(5):
+        inp.append(np.random.randn(numclass, 50, 50, 50)) # 5 samples, 3 classes, of volume shape ``(100, 100, 100)``
+        gt.append(np.random.randint(0, numclass, (50, 50, 50)))
     if class_specific:
         estim = np.random.rand(numclass, )
     else:

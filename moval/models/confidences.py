@@ -78,24 +78,23 @@ class Confidence(abc.ABC):
         
         """
 
-        num_class = inp.shape[1]
-        if T is None:
-            T = np.ones(num_class)
-        
         if isinstance(inp, list):
             # inp is a list, segmentaiton task
+            num_class = inp[0].shape[0]
+            if T is None:
+                T = np.ones(num_class)
 
             conf_scores = []
 
-            for n_case in len(inp):
+            for n_case in range(len(inp)):
 
-                inp_case = inp[n_case]
-                inp_case = inp_case[np.newaxis, ...]
+                inp_case = inp[n_case] # (d, H, W, (D))
+                inp_case = inp_case[np.newaxis, ...] # (1, d, H, W, (D))
 
                 inp_case, inp_shape = self.reshape_inp(inp_case)
                 # now inp_case is of shape ``(n, d)``
 
-                pred = np.argmax(inp_case, axis=1)
+                pred = np.argmax(inp_case, axis=1) # ``(n, )``
                 conf_score = np.zeros(inp_case.shape[0]) # ``(n, )``
                 
                 if len(T) == 1:
@@ -117,6 +116,10 @@ class Confidence(abc.ABC):
 
         else:
             # inp is not a list, classification task
+
+            num_class = inp.shape[1]
+            if T is None:
+                T = np.ones(num_class)
 
             pred = np.argmax(inp, axis=1)
             conf_score = np.zeros(inp.shape[0]) # ``(n, )``

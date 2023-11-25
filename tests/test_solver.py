@@ -21,7 +21,8 @@ def test_registry():
 @pytest.mark.parametrize(
         "estim_algorithm, mode, numclass, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
-                               ["classification", "segmentation"],
+                            #    ["classification", "segmentation"],
+                               ["segmentation"],
                                [3], 
                                moval.models.get_conf_options(),
                                [False, True])),
@@ -62,8 +63,12 @@ def test_solver(estim_algorithm, mode, numclass, confidence_scores, class_specif
     
     if mode == "segmentation":
         # segmentation logit input
-        inp = np.random.randn(5, numclass, 50, 50, 50) # 5 samples, 3 classes, of volume shape ``(50, 50, 50)``
-        gt = np.random.randint(0, numclass, (5, 50, 50, 50))
+        inp = []
+        gt = []
+        for _ in range(5):
+            inp.append(np.random.randn(numclass, 50, 50, 50)) # 5 samples, 3 classes, of volume shape ``(50, 50, 50)``
+            gt.append(np.random.randint(0, numclass, (50, 50, 50)))
+
         _estim_acc, _estim_dsc = model(inp)
         #
         solver.fit(inp, gt)

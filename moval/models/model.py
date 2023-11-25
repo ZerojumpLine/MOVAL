@@ -139,7 +139,7 @@ class Model(abc.ABC):
         if isinstance(scores, list):
             
             _normalized_scores = []
-            for n_case in len(scores):
+            for n_case in range(len(scores)):
                 _normalized_scores.append( (scores[n_case] - self.min_value) / (self.max_value - self.min_value + e1) )
 
             if lb is None:
@@ -149,13 +149,13 @@ class Model(abc.ABC):
 
                 normalized_scores = []
 
-                for n_case in len(_normalized_scores):
+                for n_case in range(len(_normalized_scores)):
 
                     # reshape normalized_scores, pred to vectors.
                     inp_shape = _normalized_scores[n_case].shape
 
                     # flaten the logit for segmentation.
-                    normalized_score = normalized_scores[n_case].reshape((-1))
+                    normalized_score = _normalized_scores[n_case].reshape((-1))
                     pred_case = pred[n_case].reshape((-1))
 
                     # normalized_scores now is of shape ``(n, )``
@@ -232,7 +232,7 @@ class Model(abc.ABC):
             # for segmentation tasks, return average confidence for background class (c=0), and return the soft dsc for other foreground classes.
             scores = []
             scores_bg = []
-            for n_case in len(inp):
+            for n_case in range(len(inp)):
                 pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                 pred_flatten = pred_case.flatten() # ``n``
                 score_flatten = score[n_case].flatten() # ``n``
@@ -240,20 +240,21 @@ class Model(abc.ABC):
                 scores.append(score_flatten)
                 scores_bg.append(score_flatten_bg)
 
-            estim_acc = np.mean( np.concatenate(score_flatten) )
-            estim_acc_bg = np.mean( np.concatenate(score_flatten_bg) )
+            estim_acc = np.mean( np.concatenate(scores) )
+            estim_acc_bg = np.mean( np.concatenate(scores_bg) )
             
             # Note, the calculation of dice score need the probability of non-maximum classes 
             # here we extend score from shape ``(n, H, W, (D))`` to ``(n, d, H, W, (D))``, the other dimension are just filled with zeros
             estim_dsc_list = []
-            for n_case in len(inp):
+            for n_case in range(len(inp)):
                 pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                 pred_flatten = pred_case.flatten() # ``n``
                 score_case = score[n_case] # ``(H, W, (D))``
                 score_flatten = score[n_case].flatten() # ``n``
-                score_filled = np.zeros(((self.num_class,), score_flatten.shape)) # ``(d, n)``
-                score_filled[pred_flatten, np.arange(score_filled.shape[0])] = score_flatten # ``(d, n)``
-                score_filled = score_filled.reshape(((self.num_class,), score_case.shape)) # ``(d, H, W, (D))``
+                score_filled = np.zeros((score_flatten.shape + (self.num_class,))) # ``(n, d)``
+                score_filled[np.arange(score_filled.shape[0]), pred_flatten] = score_flatten # ``(n, d)``
+                score_filled = score_filled.T # ``(d, n)``
+                score_filled = score_filled.reshape(((self.num_class,) + score_case.shape)) # ``(d, H, W, (D))``
                 #
                 estim_dsc = SoftDiceLoss(score_filled[np.newaxis, ...], pred_case[np.newaxis, ...])
                 estim_dsc_list.append(estim_dsc)
@@ -345,7 +346,7 @@ class tsModel(Model):
                 score = self._normalize(score, lb = self.param, pred = pred)
             elif self.mode == "segmentation":
                 preds = []
-                for n_case in len(score):
+                for n_case in range(len(score)):
                     pred_case = np.argmax(inp[n_case], axis = 0)
                     preds.append(pred_case)
                 score = self._normalize(score, lb = self.param, pred = preds)
@@ -396,7 +397,7 @@ class docModel(Model):
                 return score - (1 - self.param)
             elif self.mode == "segmentation":
                 score_post = []
-                for n_case in len(score):
+                for n_case in range(len(score)):
                     score_case = score[n_case] - (1 - self.param)
                     score_post.append(score_case)
                 return score_post
@@ -412,7 +413,7 @@ class docModel(Model):
                 return score
             elif self.mode == "segmentation":
                 score_post = []
-                for n_case in len(score):
+                for n_case in range(len(score)):
                     score_case = score[n_case] # ``(H, W, (D))``
                     pred_case = np.argmax(inp[n_case], axis = 0)
                     score_shape = score_case.shape
@@ -467,7 +468,7 @@ class atcModel(Model):
                 return score
             elif self.mode == "segmentation":
                 score_post = []
-                for n_case in len(_score):
+                for n_case in range(len(_score)):
                     score = np.zeros(_score[n_case].shape)
                     score[_score[n_case] > self.param] = 1
                     score_post.append(score)
@@ -477,6 +478,7 @@ class atcModel(Model):
         else:
             # class-wise average confidence
             if self.mode == "classification":
+                score = np.zeros(inp.shape[0])
                 pred = np.argmax(inp, axis = 1)
                 for kcls in range(inp.shape[1]):
                     pos_cls = np.where(pred == kcls)[0]
@@ -486,9 +488,9 @@ class atcModel(Model):
                 return score
             elif self.mode == "segmentation":
                 score_post = []
-                for n_case in len(_score):
+                for n_case in range(len(_score)):
                     _score_case = _score[n_case] # ``(H, W, (D))``
-                    score_case = np.zeros(_score[n_case])
+                    score_case = np.zeros(_score[n_case].shape)
                     pred_case = np.argmax(inp[n_case], axis = 0)
                     score_shape = score_case.shape
                     pred_flatten = pred_case.flatten()
@@ -542,7 +544,7 @@ class tsatcModel(Model):
                 _score = self._normalize(_score, lb = self.param, pred = pred)
             elif self.mode == "segmentation":
                 preds = []
-                for n_case in len(_score):
+                for n_case in range(len(_score)):
                     pred_case = np.argmax(inp[n_case], axis = 0)
                     preds.append(pred_case)
                 _score = self._normalize(_score, lb = self.param, pred = preds)
@@ -555,13 +557,13 @@ class tsatcModel(Model):
         if not self.class_specific:
             if self.mode == "classification":
                 score = np.zeros(inp.shape[0])
-                score[_score > self.param] = 1
+                score[_score > self.param_ext] = 1
                 return score
             elif self.mode == "segmentation":
                 score_post = []
-                for n_case in len(_score):
+                for n_case in range(len(_score)):
                     score = np.zeros(_score[n_case].shape)
-                    score[_score[n_case] > self.param] = 1
+                    score[_score[n_case] > self.param_ext] = 1
                     score_post.append(score)
                 return score_post
             else:
@@ -569,6 +571,7 @@ class tsatcModel(Model):
         else:
             # class-wise average confidence
             if self.mode == "classification":
+                score = np.zeros(inp.shape[0])
                 pred = np.argmax(inp, axis = 1)
                 for kcls in range(inp.shape[1]):
                     pos_cls = np.where(pred == kcls)[0]
@@ -578,9 +581,9 @@ class tsatcModel(Model):
                 return score
             elif self.mode == "segmentation":
                 score_post = []
-                for n_case in len(_score):
+                for n_case in range(len(_score)):
                     _score_case = _score[n_case] # ``(H, W, (D))``
-                    score_case = np.zeros(_score[n_case])
+                    score_case = np.zeros(_score[n_case].shape)
                     pred_case = np.argmax(inp[n_case], axis = 0)
                     score_shape = score_case.shape
                     pred_flatten = pred_case.flatten()
