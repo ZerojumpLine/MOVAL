@@ -104,9 +104,17 @@ class Solver(abc.ABC):
             If the model contains extended parameters, will return Tuple[param, param_ext].
 
         """
+
+        print(f"Starting optimizing for model {self.model.estim_algorithm} with confidence {self.model.confidence_scores}, class specific is {self.model.class_specific}.")
+
         if self.model.estim_algorithm == "ac-model":
-            # do not need optimization.
-            
+            # do not need optimization, end task as soon as we possible!
+
+            self.model.train()
+
+            if self.model.conf.normalization:
+                _, _ = self.model(inp)
+
             self.model.eval()
             self.model.is_fitted = True
 
@@ -119,8 +127,16 @@ class Solver(abc.ABC):
 
         optimization_method = 'Nelder-Mead'
         x0 = np.array([1.0])
-        initial_conditions = [np.array([0.1 * x1]) for x1 in range(1, 10)]
         search_threshold = 0.01 # if the optimized results are larger than this, we go through the initial conditions
+
+        if self.model.mode == "classification":
+            initial_conditions = [np.array([0.001]), np.array([0.1]), np.array([0.2]), np.array([0.3]), np.array([0.4]),
+                                  np.array([0.5]), np.array([0.6]), np.array([0.7]), np.array([0.8]), np.array([0.9])]
+            print(f"Opitimizing with {inp.shape[0]} samples...")
+        else:
+            initial_conditions = [np.array([0.001]), np.array([0.5])]
+            print(f"Opitimizing with {len(inp)} samples...")
+            print("Be patient, it should take a while...")
 
         if self.class_specific:
             for kcls in range(self.model.num_class):
@@ -129,23 +145,27 @@ class Solver(abc.ABC):
                                 fun = self.eval_func,
                                 x0 = x0,
                                 method = optimization_method,
-                                bounds = [(1e-03,None)],
+                                bounds = [(1e-06,None)],
                                 tol = 1e-07)
                 
                 optimized_param = optimization_result.x[0]
 
-                if (optimization_result.fun > search_threshold) and (self.model.estim_algorithm != "ac-model"):
+                if optimization_result.fun > search_threshold:
                     # change the initial state, if we are not satisfied with the optimization results.
+                    print(f"Not satisfied with initial optimization results of param, trying more initial states...")
                     results = []
                     results.append((optimization_result.fun, optimization_result.x[0]))
+                    cnt_guess = 0
                     for initial_guess in initial_conditions:
                         optimization_result = scipy.optimize.minimize(
                                 fun = self.eval_func,
                                 x0 = initial_guess,
                                 method = optimization_method,
-                                bounds = [(1e-03,None)],
+                                bounds = [(1e-06,None)],
                                 tol = 1e-07)
                         results.append((optimization_result.fun, optimization_result.x[0]))
+                        cnt_guess += 1
+                        print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
                     
                     optimized_param = min(results, key=lambda x: x[0])[1]
 
@@ -155,30 +175,42 @@ class Solver(abc.ABC):
                             fun = self.eval_func,
                             x0 = x0,
                             method = optimization_method,
-                            bounds = [(1e-03,None)],
+                            bounds = [(1e-06,None)],
                             tol = 1e-07)
         
             optimized_param = optimization_result.x
 
             if optimization_result.fun > search_threshold:
                 # change the initial state, if we are not satisfied with the optimization results.
+                print(f"Not satisfied with initial optimization results of param, trying more initial states...")
                 results = []
                 results.append((optimization_result.fun, optimization_result.x))
+                cnt_guess = 0
                 for initial_guess in initial_conditions:
                     optimization_result = scipy.optimize.minimize(
                             fun = self.eval_func,
                             x0 = initial_guess,
                             method = optimization_method,
-                            bounds = [(1e-03,None)],
+                            bounds = [(1e-06,None)],
                             tol = 1e-07)
                     results.append((optimization_result.fun, optimization_result.x))
+                    cnt_guess += 1
+                    print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
                 
                 optimized_param = min(results, key=lambda x: x[0])[1]
 
             self.model.param = optimized_param
 
-
         if self.model.extend_param:
+            # If the model needs normalization, it learns ``min_value`` during the first stage
+            # It is maybe not desrible for the second stage, sometimes hurt performance.
+            # Therefore, here we decards the learned parameters.
+            if self.model.conf.normalization:
+                if self.model.class_specific:
+                    self.model.param = np.ones(self.model.num_class)
+                else:
+                    self.model.param = np.array([1])
+
             if self.class_specific:
                 for kcls in range(self.model.num_class):
                     self.kcls = kcls
@@ -193,8 +225,10 @@ class Solver(abc.ABC):
 
                     if optimization_result.fun > search_threshold:
                         # change the initial state, if we are not satisfied with the optimization results.
+                        print(f"Not satisfied with initial optimization results of param_ext, trying more initial states...")
                         results = []
                         results.append((optimization_result.fun, optimization_result.x[0]))
+                        cnt_guess = 0
                         for initial_guess in initial_conditions:
                             optimization_result = scipy.optimize.minimize(
                                     fun = self.eval_func_ext,
@@ -203,6 +237,8 @@ class Solver(abc.ABC):
                                     bounds = [(1e-03,None)],
                                     tol = 1e-07)
                             results.append((optimization_result.fun, optimization_result.x[0]))
+                            cnt_guess += 1
+                            print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
                         
                         optimized_param = min(results, key=lambda x: x[0])[1]
 
@@ -218,10 +254,12 @@ class Solver(abc.ABC):
 
                 optimized_param = optimization_result.x
 
-                if (optimization_result.fun > search_threshold) and (self.model.estim_algorithm != "ac-model"):
+                if optimization_result.fun > search_threshold:
                     # change the initial state, if we are not satisfied with the optimization results.
+                    print(f"Not satisfied with initial optimization results of param_ext, trying more initial states...")
                     results = []
                     results.append((optimization_result.fun, optimization_result.x))
+                    cnt_guess = 0
                     for initial_guess in initial_conditions:
                         optimization_result = scipy.optimize.minimize(
                                 fun = self.eval_func_ext,
@@ -230,6 +268,8 @@ class Solver(abc.ABC):
                                 bounds = [(1e-03,None)],
                                 tol = 1e-07)
                         results.append((optimization_result.fun, optimization_result.x))
+                        cnt_guess += 1
+                        print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
                     
                     optimized_param = min(results, key=lambda x: x[0])[1]
 

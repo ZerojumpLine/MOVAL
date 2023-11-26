@@ -111,9 +111,18 @@ class Model(abc.ABC):
             The intensity value, max and min value, will be saved.
         
         """
-
-        self.max_value = np.max(scores)
-        self.min_value = np.min(scores)
+        if isinstance(scores, list):
+            max_value_list = []
+            min_value_list = []
+            for score in scores:
+                max_value_list.append(np.max(score))
+                min_value_list.append(np.min(score))
+            self.max_value = np.max(max_value_list)
+            self.min_value = np.min(min_value_list)
+        
+        else:
+            self.max_value = np.max(scores)
+            self.min_value = np.min(scores)
 
     def _normalize(self, scores: Union[List[Iterable], np.ndarray], lb: np.ndarray = None, pred: np.ndarray = None, e1: float = 1e-6) -> Union[List[Iterable], np.ndarray]:
         """Normalize the confidence scores to [(1-self.param), 1] if the score is not bounded.
@@ -134,6 +143,7 @@ class Model(abc.ABC):
         """
 
         if self.is_training:
+            
             self._find_normalize(scores)
 
         if isinstance(scores, list):

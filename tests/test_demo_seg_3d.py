@@ -29,8 +29,6 @@ if not os.path.exists(directory_data):
     with zipfile.ZipFile(output, 'r') as zip_ref:
         zip_ref.extractall(directory_data)
 
-# intput is of shape ``(n, d, H, W, D)``
-
 # now I am playing with prostate segmentation
 Datafile_eval = "data_moval/Prostateresults/seg-eval.txt"
 Imglist_eval = open(Datafile_eval)
@@ -38,6 +36,7 @@ Imglist_eval_read = Imglist_eval.read().splitlines()
 
 logits = []
 gt = []
+# to accelerate the debugging speed, crop the middel 60 x 60 x 30 cub for training/inference.
 for Imgname_eval in Imglist_eval_read:
     GT_file = Imgname_eval.replace("data", "data_moval")
     caseID = Imgname_eval.split("/")[-1][:6]
@@ -49,6 +48,15 @@ for Imgname_eval in Imglist_eval_read:
     logit_cls1      = logit_cls1_read.get_fdata()
     GT_read         = nib.load(GT_file)
     GTimg           = GT_read.get_fdata()           # ``(H, W, D)``
+    logit_cls0      = logit_cls0[logit_cls0.shape[0] //2 - 30: logit_cls0.shape[0] //2 + 30,
+                                 logit_cls0.shape[1] //2 - 30: logit_cls0.shape[1] //2 + 30,
+                                 logit_cls0.shape[2] //2 - 15: logit_cls0.shape[2] //2 + 15]
+    logit_cls1      = logit_cls1[logit_cls1.shape[0] //2 - 30: logit_cls1.shape[0] //2 + 30,
+                                 logit_cls1.shape[1] //2 - 30: logit_cls1.shape[1] //2 + 30,
+                                 logit_cls1.shape[2] //2 - 15: logit_cls1.shape[2] //2 + 15]
+    GTimg           = GTimg[GTimg.shape[0] //2 - 30: GTimg.shape[0] //2 + 30,
+                            GTimg.shape[1] //2 - 30: GTimg.shape[1] //2 + 30,
+                            GTimg.shape[2] //2 - 15: GTimg.shape[2] //2 + 15]
     logit_cls = np.stack((logit_cls0, logit_cls1))  # ``(d, H, W, D)``
     logits.append(logit_cls)
     gt.append(GTimg)
@@ -94,10 +102,10 @@ if os.path.isfile(results_files):
     os.remove(results_files)
 
 
-# estim_algorithm = "ac-model"
+# estim_algorithm = "ts-model"
 # mode = "segmentation"
 # confidence_scores = "max_class_probability-conf"
-# class_specific = False
+# class_specific = True
 
 @pytest.mark.parametrize(
         "estim_algorithm, mode, confidence_scores, class_specific", 
@@ -154,7 +162,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
         f.write(str(err_val_dsc))
         f.write('\n')
         f.write("validation predicted dsc: ")
-        f.write(str(m_DSC))
+        f.write(str(estim_dsc))
         f.write('\n')
         f.write("moval parameter: ")
         f.write(str(moval_model.model_.param))
