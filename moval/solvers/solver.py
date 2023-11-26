@@ -92,7 +92,7 @@ class Solver(abc.ABC):
         self,
         inp: Union[List[Iterable], np.ndarray],
         gt: Union[List[Iterable], np.ndarray]
-    ):
+    ) -> Union[Tuple[np.ndarray, np.ndarray], np.ndarray]:
         """Fit the model based on scipy backend.
         
         Args:
@@ -104,6 +104,14 @@ class Solver(abc.ABC):
             If the model contains extended parameters, will return Tuple[param, param_ext].
 
         """
+        if self.model.estim_algorithm == "ac-model":
+            # do not need optimization.
+            
+            self.model.eval()
+            self.model.is_fitted = True
+
+            return self.model.param
+
         self.inp = inp
         self.gt = gt
 
@@ -152,7 +160,7 @@ class Solver(abc.ABC):
         
             optimized_param = optimization_result.x
 
-            if (optimization_result.fun > search_threshold) and (self.model.estim_algorithm != "ac-model"):
+            if optimization_result.fun > search_threshold:
                 # change the initial state, if we are not satisfied with the optimization results.
                 results = []
                 results.append((optimization_result.fun, optimization_result.x))
@@ -183,7 +191,7 @@ class Solver(abc.ABC):
                     
                     optimized_param = optimization_result.x[0]
 
-                    if (optimization_result.fun > search_threshold) and (self.model.estim_algorithm != "ac-model"):
+                    if optimization_result.fun > search_threshold:
                         # change the initial state, if we are not satisfied with the optimization results.
                         results = []
                         results.append((optimization_result.fun, optimization_result.x[0]))

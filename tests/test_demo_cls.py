@@ -55,14 +55,13 @@ if os.path.isfile(results_files):
     os.remove(results_files)
 
 @pytest.mark.parametrize(
-        "estim_algorithm, mode, numclass, confidence_scores, class_specific", 
+        "estim_algorithm, mode, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
                                ["classification"],
-                               [10], 
                                moval.models.get_conf_options(),
                                [False, True])),
 )
-def test_cls(estim_algorithm, mode, numclass, confidence_scores, class_specific):
+def test_cls(estim_algorithm, mode, confidence_scores, class_specific):
 
     moval_model = moval.MOVAL(
                 mode = mode,
@@ -83,7 +82,7 @@ def test_cls(estim_algorithm, mode, numclass, confidence_scores, class_specific)
     pred_test = np.argmax(logits_test, axis = 1)
     err_test = np.abs( np.sum(gt_test == pred_test) / len(gt_test) - estim_acc_test )
 
-    test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, numclass = {numclass}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
+    test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
 
     with open(results_files, 'a') as f:
         f.write(test_condition)

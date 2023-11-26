@@ -77,12 +77,12 @@ class Confidence(abc.ABC):
             conf_score: The calculated confidence scores, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
         
         """
+        if T is None:
+            T = np.array([1])
 
         if isinstance(inp, list):
             # inp is a list, segmentaiton task
             num_class = inp[0].shape[0]
-            if T is None:
-                T = np.ones(num_class)
 
             conf_scores = []
 
@@ -108,9 +108,9 @@ class Confidence(abc.ABC):
                     conf_score = 1 - conf_score
 
                 # transfer back to the original dimension
-                conf_score = conf_score.reshape(inp_shape[:1] + inp_shape[2:]) # ``(1, H, W, (D))``
+                conf_score = conf_score.reshape(inp_shape[2:]) # ``(H, W, (D))``
             
-                conf_scores.append(conf_score[0])
+                conf_scores.append(conf_score)
 
             return conf_scores
 
@@ -118,8 +118,6 @@ class Confidence(abc.ABC):
             # inp is not a list, classification task
 
             num_class = inp.shape[1]
-            if T is None:
-                T = np.ones(num_class)
 
             pred = np.argmax(inp, axis=1)
             conf_score = np.zeros(inp.shape[0]) # ``(n, )``

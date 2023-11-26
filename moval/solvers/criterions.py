@@ -92,33 +92,51 @@ class segCalibrate(Calibrate):
         """
 
         if not self.class_specific:
-            
-            err_all = []
+            pred_all_flatten = []
+            gt_all_flatten = []
             for n_case in range(len(inp)):
 
                 pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                 gt_case     = gt[n_case] # ``(H, W, (D))``
-                acc = np.sum(gt_case.flatten() == pred_case.flatten()) / len(gt_case.flatten())
-                err = estim - acc
-                err_all.append(err)
+                
+                pred_all_flatten.append(pred_case.flatten())
+                gt_all_flatten.append(gt_case.flatten())
+            
+            pred_all_flatten = np.concatenate(pred_all_flatten)
+            gt_all_flatten = np.concatenate(gt_all_flatten)
+
+            acc = np.sum(gt_all_flatten == pred_all_flatten) / len(gt_all_flatten)
+            err = estim - acc
+
+            return np.abs(err)
 
         else:
             
-            err_all = []
+            pred_all_flatten_bg = []
+            gt_all_flatten_bg = []
+            dsc = []
+
             for n_case in range(len(inp)):
 
                 pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                 gt_case     = gt[n_case] # ``(H, W, (D))``
-                err = np.zeros(inp[n_case].shape[0])
                 
                 pos_bg = np.where(pred_case.flatten() == 0)[0]
-                acc_bg = np.sum(gt_case.flatten()[pos_bg] == pred_case.flatten()[pos_bg]) / len(gt_case.flatten()[pos_bg])
-                err[0] = estim[0] - acc_bg
 
+                pred_all_flatten_bg.append(pred_case.flatten()[pos_bg])
+                gt_all_flatten_bg.append(gt_case.flatten()[pos_bg])
+
+                dsc_case = np.zeros(inp[n_case].shape[0])
                 for kcls in range(1, inp[n_case].shape[0]):
-                    err[kcls] = estim[kcls] - ComputMetric(pred_case == kcls, gt_case == kcls)
-                err_all.append(err)
+                    dsc_case[kcls] = ComputMetric(pred_case == kcls, gt_case == kcls)
+                dsc.append(dsc_case)
 
-        m_err = np.mean(np.array(err_all), axis=0)
+            pred_all_flatten_bg = np.concatenate(pred_all_flatten_bg)
+            gt_all_flatten_bg = np.concatenate(gt_all_flatten_bg)
 
-        return np.abs(m_err)
+            acc_bg = np.sum(gt_all_flatten_bg == pred_all_flatten_bg) / len(gt_all_flatten_bg)
+            
+            err = estim - np.mean(np.array(dsc), axis=0)
+            err[0] = estim[0] - acc_bg
+
+            return np.abs(err)

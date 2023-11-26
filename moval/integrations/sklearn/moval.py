@@ -131,7 +131,10 @@ class MOVAL(BaseEstimator):
         #
         self.model_ = model
         self.solver_ = solver
-        self.n_dim_ = len(logits.shape)
+        if self.mode == "classification":
+            self.n_dim_ = len(logits.shape)
+        else:
+            self.n_dim_ = len(logits[0].shape)
 
         return self
     
@@ -159,11 +162,18 @@ class MOVAL(BaseEstimator):
         """
 
         # Input validation
-        if self.n_dim_ != len(logits.shape):
-            raise ValueError(
-                    f"Inconsistent input dimension: training and test samples have different dimenstions"
-                    f"(dimension of training samples, {len(self.n_dim_)}, while dimension of test samples, {len(logits.shape)})"
-                )
+        if self.mode == "classification":
+            if self.n_dim_ != len(logits.shape):
+                raise ValueError(
+                        f"Inconsistent input dimension: training and test samples have different dimenstions"
+                        f"(dimension of training samples, {len(self.n_dim_)}, while dimension of test samples, {len(logits.shape)})"
+                    )
+        else:
+            if self.n_dim_ != len(logits[0].shape):
+                raise ValueError(
+                        f"Inconsistent input dimension: training and test samples have different dimenstions"
+                        f"(dimension of training samples, {len(self.n_dim_)}, while dimension of test samples, {len(logits[0].shape)})"
+                    )
 
         model = self.model_
 

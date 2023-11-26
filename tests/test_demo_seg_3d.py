@@ -40,24 +40,18 @@ logits = []
 gt = []
 for Imgname_eval in Imglist_eval_read:
     GT_file = Imgname_eval.replace("data", "data_moval")
-
     caseID = Imgname_eval.split("/")[-1][:6]
-
     logit_cls0_file = "data_moval/Prostateresults/prostateval/results/pred_" + caseID + "cls0_prob.nii.gz"
-    logit_cls1_file = "data_moval/Prostateresults/prostateval/results/pred_" + caseID + "cls0_prob.nii.gz"
-
+    logit_cls1_file = "data_moval/Prostateresults/prostateval/results/pred_" + caseID + "cls1_prob.nii.gz"
     logit_cls0_read = nib.load(logit_cls0_file)
     logit_cls1_read = nib.load(logit_cls1_file)
     logit_cls0      = logit_cls0_read.get_fdata()   # ``(H, W, D)``
     logit_cls1      = logit_cls1_read.get_fdata()
     GT_read         = nib.load(GT_file)
     GTimg           = GT_read.get_fdata()           # ``(H, W, D)``
-
     logit_cls = np.stack((logit_cls0, logit_cls1))  # ``(d, H, W, D)``
-    
     logits.append(logit_cls)
     gt.append(GTimg)
-
 
 # logits is a list of length ``n``,  each element has ``(d, H, W, D)``. 
 # gt is a list of length ``n``,  each element has ``(H, W, D)``.
@@ -75,7 +69,7 @@ for Imgname_test in Imglist_test_read:
     caseID = Imgname_test.split("/")[-1][:6]
 
     logit_cls0_file = "data_moval/Prostateresults/prostattestcondition_A/results/pred_" + caseID + "cls0_prob.nii.gz"
-    logit_cls1_file = "data_moval/Prostateresults/prostattestcondition_A/results/pred_" + caseID + "cls0_prob.nii.gz"
+    logit_cls1_file = "data_moval/Prostateresults/prostattestcondition_A/results/pred_" + caseID + "cls1_prob.nii.gz"
 
     logit_cls0_read = nib.load(logit_cls0_file)
     logit_cls1_read = nib.load(logit_cls1_file)
@@ -99,15 +93,20 @@ results_files = "results_demo_seg_3d.txt"
 if os.path.isfile(results_files):
     os.remove(results_files)
 
+
+# estim_algorithm = "ac-model"
+# mode = "segmentation"
+# confidence_scores = "max_class_probability-conf"
+# class_specific = False
+
 @pytest.mark.parametrize(
-        "estim_algorithm, mode, numclass, confidence_scores, class_specific", 
+        "estim_algorithm, mode, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
                                ["segmentation"],
-                               [2], 
                                moval.models.get_conf_options(),
                                [False, True])),
 )
-def test_seg_3d(estim_algorithm, mode, numclass, confidence_scores, class_specific):
+def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
 
     moval_model = moval.MOVAL(
                 mode = mode,
@@ -121,7 +120,7 @@ def test_seg_3d(estim_algorithm, mode, numclass, confidence_scores, class_specif
     estim_dsc = moval_model.estimate(logits)
     
     DSC_list = []
-    for n_case in len(logits):
+    for n_case in range(len(logits)):
         pred_case   = np.argmax(logits[n_case], axis = 0) # ``(H, W, (D))``
         gt_case     = gt[n_case] # ``(H, W, (D))``
 
@@ -129,14 +128,14 @@ def test_seg_3d(estim_algorithm, mode, numclass, confidence_scores, class_specif
         DSC_list.append(DSC)
     m_DSC = np.mean(np.array(DSC_list))
     
-    err_val = np.abs( m_DSC - estim_dsc )
+    err_val_dsc = np.abs( m_DSC - estim_dsc )
 
     # save the test err in the result files.
 
     estim_dsc_test = moval_model.estimate(logits_test)
 
     DSC_list_test = []
-    for n_case in len(logits_test):
+    for n_case in range(len(logits_test)):
         pred_case   = np.argmax(logits_test[n_case], axis = 0) # ``(H, W, (D))``
         gt_case     = gt[n_case] # ``(H, W, (D))``
 
@@ -146,13 +145,16 @@ def test_seg_3d(estim_algorithm, mode, numclass, confidence_scores, class_specif
 
     err_test = np.abs( m_DSC_test - estim_dsc_test )
 
-    test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, numclass = {numclass}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
+    test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
 
     with open(results_files, 'a') as f:
         f.write(test_condition)
         f.write('\n')
-        f.write("validation err: ")
-        f.write(str(err_val))
+        f.write("validation acc err: ")
+        f.write(str(err_val_acc))
+        f.write('\n')
+        f.write("validation dsc err: ")
+        f.write(str(err_val_dsc))
         f.write('\n')
         f.write("moval parameter: ")
         f.write(str(moval_model.model_.param))
