@@ -11,8 +11,6 @@ import moval
 
 """Test the func with 2d segmentation tasks.
 
-    Of note, for 2d segmentation, I should select the cases that contain manual labels
-
     Examples:
         >>> pytest tests/test_demo_seg_2d.py
 
@@ -38,6 +36,7 @@ Imglist_eval_read = Imglist_eval.read().splitlines()
 
 logits = []
 gt = []
+# to accelerate the debugging speed, crop the middel 60 x 60 x 30 cub for training/inference.
 for Imgname_eval in Imglist_eval_read:
     GT_file = Imgname_eval.replace("data", "data_moval")
     caseID = Imgname_eval.split("/")[-1][:6]
@@ -49,16 +48,25 @@ for Imgname_eval in Imglist_eval_read:
     logit_cls1      = logit_cls1_read.get_fdata()
     GT_read         = nib.load(GT_file)
     GTimg           = GT_read.get_fdata()           # ``(H, W, D)``
+    logit_cls0      = logit_cls0[logit_cls0.shape[0] //2 - 30: logit_cls0.shape[0] //2 + 30,
+                                 logit_cls0.shape[1] //2 - 30: logit_cls0.shape[1] //2 + 30,
+                                 logit_cls0.shape[2] //2 - 15: logit_cls0.shape[2] //2 + 15]
+    logit_cls1      = logit_cls1[logit_cls1.shape[0] //2 - 30: logit_cls1.shape[0] //2 + 30,
+                                 logit_cls1.shape[1] //2 - 30: logit_cls1.shape[1] //2 + 30,
+                                 logit_cls1.shape[2] //2 - 15: logit_cls1.shape[2] //2 + 15]
+    GTimg           = GTimg[GTimg.shape[0] //2 - 30: GTimg.shape[0] //2 + 30,
+                            GTimg.shape[1] //2 - 30: GTimg.shape[1] //2 + 30,
+                            GTimg.shape[2] //2 - 15: GTimg.shape[2] //2 + 15]
     logit_cls = np.stack((logit_cls0, logit_cls1))  # ``(d, H, W, D)``
+    # only including the slices that contains labels
+    for dslice in range(GTimg.shape[2]):
+        if np.sum(GTimg[:, :, dslice]) > 0:
+            logits.append(logit_cls[:, :, :, dslice])
+            gt.append(GTimg[:, :, dslice])
 
-    
-
-    logits.append(logit_cls)
-    gt.append(GTimg)
-
-# logits is a list of length ``n``,  each element has ``(d, H, W, D)``. 
-# gt is a list of length ``n``,  each element has ``(H, W, D)``.
-# H, W and D could differ for different cases.
+# logits is a list of length ``n``,  each element has ``(d, H, W)``. 
+# gt is a list of length ``n``,  each element has ``(H, W)``.
+# H and W could differ for different cases.
 
 Datafile_test = "data_moval/Prostateresults/seg-testA.txt"
 Imglist_test = open(Datafile_test)
@@ -83,19 +91,20 @@ for Imgname_test in Imglist_test_read:
 
     logit_cls = np.stack((logit_cls0, logit_cls1))  # ``(n, H, W, D)``
     
-    logits_test.append(logit_cls)
-    gt_test.append(GTimg)
+    # only including the slices that contains labels
+    for dslice in range(GTimg.shape[2]):
+        if np.sum(GTimg[:, :, dslice]) > 0:
+            logits_test.append(logit_cls[:, :, :, dslice])
+            gt_test.append(GTimg[:, :, dslice])
 
+# logits_test is a list of length ``n``,  each element has ``(d, H, W)``. 
+# gt_test is a list of length ``n``,  each element has ``(H, W)``.
+# H and W could differ for different cases.
 
-# logits_test is a list of length ``n``,  each element has ``(d, H, W, D)``. 
-# gt_test is a list of length ``n``,  each element has ``(H, W, D)``.
-# H, W and D could differ for different cases.
-
-results_files = "results_demo_seg_3d.txt"
+results_files = "results_demo_seg_2d.txt"
 # clean previous results
 if os.path.isfile(results_files):
     os.remove(results_files)
-
 
 # estim_algorithm = "ts-model"
 # mode = "segmentation"
@@ -157,7 +166,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
         f.write(str(err_val_dsc))
         f.write('\n')
         f.write("validation predicted dsc: ")
-        f.write(str(m_DSC))
+        f.write(str(estim_dsc))
         f.write('\n')
         f.write("moval parameter: ")
         f.write(str(moval_model.model_.param))
