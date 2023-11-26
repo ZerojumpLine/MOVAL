@@ -159,3 +159,5 @@ cython_debug/
 *.pkl
 data_moval.zip
 data_moval
+results_demo_seg_3d.txt
+results_demo_cls.txt

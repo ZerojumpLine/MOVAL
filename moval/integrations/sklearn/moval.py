@@ -74,7 +74,7 @@ class MOVAL(BaseEstimator):
 
         # initilization
         if isinstance(logits, list):
-            self.numclass = logits[0].shape[-1]
+            self.numclass = logits[0].shape[0]
         else:
             self.numclass = logits.shape[-1]
 

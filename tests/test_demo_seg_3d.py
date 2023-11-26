@@ -137,7 +137,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
     DSC_list_test = []
     for n_case in range(len(logits_test)):
         pred_case   = np.argmax(logits_test[n_case], axis = 0) # ``(H, W, (D))``
-        gt_case     = gt[n_case] # ``(H, W, (D))``
+        gt_case     = gt_test[n_case] # ``(H, W, (D))``
 
         DSC = ComputMetric(pred_case == 1, gt_case == 1)
         DSC_list_test.append(DSC)
@@ -150,11 +150,11 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
     with open(results_files, 'a') as f:
         f.write(test_condition)
         f.write('\n')
-        f.write("validation acc err: ")
-        f.write(str(err_val_acc))
-        f.write('\n')
         f.write("validation dsc err: ")
         f.write(str(err_val_dsc))
+        f.write('\n')
+        f.write("validation predicted dsc: ")
+        f.write(str(m_DSC))
         f.write('\n')
         f.write("moval parameter: ")
         f.write(str(moval_model.model_.param))
