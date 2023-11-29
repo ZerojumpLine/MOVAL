@@ -159,6 +159,9 @@ cython_debug/
 *.pkl
 data_moval.zip
 data_moval
+data_moval_supp.zip
+data_moval_supp
 results_demo_seg_3d.txt
 results_demo_seg_2d.txt
 results_demo_cls.txt
+results_demo_seg_2d_multicls.txt
