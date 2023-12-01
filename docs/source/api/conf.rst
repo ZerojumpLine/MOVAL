@@ -1,6 +1,6 @@
 models
 --------
 
-.. automodule:: moval.models.Model
+.. automodule:: moval.models.Confidence
    :show-inheritance:
    :members:

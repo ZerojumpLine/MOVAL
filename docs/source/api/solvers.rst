@@ -1,6 +1,6 @@
 solvers
 --------
 
-.. automodule:: moval.solvers
+.. automodule:: moval.solvers.Calibrate
    :show-inheritance:
    :members:

@@ -18,7 +18,7 @@ Contents
 
 .. toctree::
 
-   nstallation
+   installation
    usage
    demos
    api
