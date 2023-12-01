@@ -272,5 +272,5 @@ class MOVAL(BaseEstimator):
 
         return moval_model
     
-    def set_fit_request(self, *args, **kwargs):
-        pass
+# Dynamically remove the set_fit_request method
+del MOVAL.set_fit_request
