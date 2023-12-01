@@ -1,5 +1,5 @@
 Estimation Algorithms
---------
+------------------------
 
 .. autoclass:: moval.models.Model
    :show-inheritance:
