@@ -1,10 +1,10 @@
 Estimation Algorithms
 --------
 
-.. automodule:: moval.models
+.. autoclass:: moval.models.Model
    :show-inheritance:
    :members:
 
-.. automodule:: moval.models.acModel
+.. autoclass:: moval.models.acModel
    :show-inheritance:
    :members:

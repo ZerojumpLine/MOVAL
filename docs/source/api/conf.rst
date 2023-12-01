@@ -1,6 +1,10 @@
 Confidence Scores
 --------
 
-.. automodule:: moval.models.Confidence
+.. autoclass:: moval.models.Confidence
+   :show-inheritance:
+   :members:
+
+.. autoclass:: moval.models.maxclassprobabilityConfidence
    :show-inheritance:
    :members:

@@ -1,4 +1,4 @@
-solvers
+Solvers
 --------
 
 .. automodule:: moval.solvers.Calibrate
