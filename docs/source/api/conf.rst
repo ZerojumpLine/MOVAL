@@ -1,4 +1,4 @@
-models
+Confidence Scores
 --------
 
 .. automodule:: moval.models.Confidence
