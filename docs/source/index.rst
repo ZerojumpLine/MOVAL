@@ -3,7 +3,7 @@ Welcome to MOVAL's documentation!
 
 
 
-Check out the :doc:`installation` section to install the package.
+Check out the :doc:`Installation` section to install the package.
 Check out the :doc:`usage` section for further information. 
 
 .. note::
@@ -16,7 +16,7 @@ Contents
 .. toctree::
    :maxdepth: 2
 
-   installation
+   Installation
    usage
    demos
    api
