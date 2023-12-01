@@ -2,11 +2,12 @@
 import numpy as np
 from typing import Callable, Iterable, List, Literal, Optional, Tuple, Union
 from sklearn.base import BaseEstimator
+from sklearn.base import TransformerMixin
 import moval.models
 import moval.solvers
 import pickle
 
-class MOVAL(BaseEstimator):
+class MOVAL(BaseEstimator, TransformerMixin):
     """ MOVAL model defined as part of a ``scikit-learn``-like API.
 
     Attributes:
