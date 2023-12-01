@@ -11,19 +11,15 @@ class MOVAL(BaseEstimator):
 
     Attributes:
         mode (str):
-            The given task to estimate model performance.
-            |Default:| ``classification``
+            The given task to estimate model performance. |Default:| ``classification``
         confidence_scores (str):
             The method to calculate the confidence scores. We provide a list of confidence score calculation methods which 
-            can be displayed by running :py:func:`moval.models.get_conf_options`.
-            |Default:| ``raw``
+            can be displayed by running :py:func:`moval.models.get_conf_options`. |Default:| ``raw``
         estim_algorithm (str):
             The algorithm to estimate model performance. We also provide a list of estimation algorithm which can be displayed by
-            running :py:func:`moval.models.get_estim_options`.
-            |Default:| ``ac``
+            running :py:func:`moval.models.get_estim_options`. |Default:| ``ac``
         class_specific (bool):
-            If ``True``, the calculation will match class-wise confidence to class-wise accuracy.
-            |Default:| ``False``
+            If ``True``, the calculation will match class-wise confidence to class-wise accuracy. |Default:| ``False``
 
     Example:
         

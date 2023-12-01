@@ -1,18 +1,10 @@
 API
 ===
 
-.. autoclass:: moval.MOVAL
-   :show-inheritance:
-   :members:
 
-.. automodule:: moval.models.Confidence
-   :show-inheritance:
-   :members:
+.. toctree::
+   :hidden:
 
-.. automodule:: moval.models.Model
-   :show-inheritance:
-   :members:
-
-.. automodule:: moval.solvers.Calibrate
-   :show-inheritance:
-   :members:
+   api/moval
+   api/models
+   api/solvers
