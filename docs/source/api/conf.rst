@@ -1,5 +1,5 @@
 Confidence Scores
---------
+------------------------
 
 .. autoclass:: moval.models.Confidence
    :show-inheritance:
