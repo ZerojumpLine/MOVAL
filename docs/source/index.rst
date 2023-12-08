@@ -18,7 +18,7 @@ Contents
 
    Installation
    usage
-   demos
+   tutorial
    api
 
 

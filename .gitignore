@@ -161,6 +161,12 @@ data_moval.zip
 data_moval
 data_moval_supp.zip
 data_moval_supp
+img_cifar.zip
+img_cifar
+img_cardiac.zip
+img_cardiac
+img_prostate.zip
+img_prostate
 results_demo_seg_3d.txt
 results_demo_seg_2d.txt
 results_demo_cls.txt

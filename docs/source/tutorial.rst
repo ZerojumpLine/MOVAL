@@ -1,12 +1,12 @@
-Demos
+Tutorial
 ===================================
 
 .. toctree::
    :maxdepth: 2
 
-   demos/classification
-   demos/segmentation_2d
-   demos/segmentation_3d
+   demos/estim_cls
+   demos/estim_seg2d
+   demos/estim_seg3d
    demos/analysis_cls
    demos/analysis_seg2d
    demos/analysis_seg3d

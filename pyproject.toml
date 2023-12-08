@@ -30,16 +30,6 @@ skip = [
 ]
 
 
-[tool.pytest.ini_options]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "requires_dataset: tests that need access to a local dataset",
-    "cpu",
-    "cuda",
-]
-addopts = "--ignore=cebra/integrations/threejs --ignore=cebra/integrations/streamlit.py --ignore=cebra/datasets"
-
-
 
 # This Pylint rcfile contains a best-effort configuration to uphold the
 # best-practices and style described in the Google Python style guide:
