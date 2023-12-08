@@ -1,2 +1,2 @@
-Segmentation 2D
+Analysis 2d segmentation
 ===================================
