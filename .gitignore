@@ -7,7 +7,7 @@ exports/
 demo_notebooks/
 
 # Binary files
-*.png
+# *.png
 *.jpg
 *.jpeg
 *.ipynb
