@@ -6,7 +6,7 @@
 
 What it offers:
 
-<br/> <div align=center><img src="docs/Fig_software.png" width="750px"/></div>
+<br/> <div align=center><img src="software_features.png" width="750px"/></div>
 
 
 ## User Document
