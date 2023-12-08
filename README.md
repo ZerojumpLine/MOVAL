@@ -5,9 +5,7 @@
 **MOVAL** highlights a key feature—class-wise calibration, recognized as essential for addressing long-tailed distributions commonly found in real-world datasets. This proves especially significant in segmentation tasks where background samples often outnumber foregrounds. The inclusion of class-specific variants becomes crucial for accurately estimating segmentation performance. Additionally, MOVAL offers support for various types of confidence scores, enhancing its versatility.
 
 What it offers:
-
-<br/> <div align=center><img src="software_features.png" width="750px"/></div>
-
+<br/> <div align=center><img src="docs/software_features.png" width="750px"/></div>
 
 ## User Document
 
