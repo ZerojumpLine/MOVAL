@@ -10,7 +10,7 @@ demo_notebooks/
 # *.png
 *.jpg
 *.jpeg
-*.ipynb
+# *.ipynb
 *.svg
 *.mp4
 
