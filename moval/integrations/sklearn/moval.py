@@ -165,39 +165,38 @@ class MOVAL(BaseEstimator):
             logit_map = logits[k_case]
             gt_map = gt[k_case]
         
-        if len(gt_map.shape) == 2:
-            border_x, border_y = gt_map.shape
-            ind_x, ind_y = np.where(gt_map != 0)
-            #
-            max_x = np.min((np.max(ind_x) + boundary, border_x))
-            min_x = np.max((np.min(ind_x) - boundary, 0))
-            #
-            max_y = np.min((np.max(ind_y) + boundary, border_y))
-            min_y = np.max((np.min(ind_y) - boundary, 0))
-            #
-            logits_post.append(logit_map[:, min_x:max_x, min_y:max_y])
-            gt_post.append(gt_map[min_x:max_x, min_y:max_y])
+            if len(gt_map.shape) == 2:
+                border_x, border_y = gt_map.shape
+                ind_x, ind_y = np.where(gt_map != 0)
+                #
+                max_x = np.min((np.max(ind_x) + boundary, border_x))
+                min_x = np.max((np.min(ind_x) - boundary, 0))
+                #
+                max_y = np.min((np.max(ind_y) + boundary, border_y))
+                min_y = np.max((np.min(ind_y) - boundary, 0))
+                #
+                logits_post.append(logit_map[:, min_x:max_x, min_y:max_y])
+                gt_post.append(gt_map[min_x:max_x, min_y:max_y])
 
-            return logits_post, gt_post
-        elif len(gt_map.shape) == 3:
-            border_x, border_y, border_z = gt_map.shape
-            ind_x, ind_y, ind_z = np.where(gt_map != 0)
-            #
-            max_x = np.min((np.max(ind_x) + boundary, border_x))
-            min_x = np.max((np.min(ind_x) - boundary, 0))
-            #
-            max_y = np.min((np.max(ind_y) + boundary, border_y))
-            min_y = np.max((np.min(ind_y) - boundary, 0))
-            #
-            max_z = np.min((np.max(ind_z) + boundary, border_z))
-            min_z = np.max((np.min(ind_z) - boundary, 0))
-            #
-            logits_post.append(logit_map[:, min_x:max_x, min_y:max_y, min_z:max_z])
-            gt_post.append(gt_map[min_x:max_x, min_y:max_y, min_z:max_z])
-
-            return logits_post, gt_post
-        else:
-            raise ValueError("Not implemented!")
+            elif len(gt_map.shape) == 3:
+                border_x, border_y, border_z = gt_map.shape
+                ind_x, ind_y, ind_z = np.where(gt_map != 0)
+                #
+                max_x = np.min((np.max(ind_x) + boundary, border_x))
+                min_x = np.max((np.min(ind_x) - boundary, 0))
+                #
+                max_y = np.min((np.max(ind_y) + boundary, border_y))
+                min_y = np.max((np.min(ind_y) - boundary, 0))
+                #
+                max_z = np.min((np.max(ind_z) + boundary, border_z))
+                min_z = np.max((np.min(ind_z) - boundary, 0))
+                #
+                logits_post.append(logit_map[:, min_x:max_x, min_y:max_y, min_z:max_z])
+                gt_post.append(gt_map[min_x:max_x, min_y:max_y, min_z:max_z])
+            else:
+                raise ValueError("Not implemented!")
+        
+        return logits_post, gt_post
         
 
     
