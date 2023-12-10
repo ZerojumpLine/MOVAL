@@ -22,6 +22,8 @@ class MOVAL(BaseEstimator):
             If ``True``, the calculation will match class-wise confidence to class-wise accuracy. |Default:| ``False``
         approximate (bool):
             If ``True``, we crop the image and label map to accelerate the optimization of segmentation. |Default:| ``False``
+        approximate_boundary (int):
+            The enlarged regions of the region to crop. |Default:| ``30``
 
     Example:
         
@@ -42,7 +44,8 @@ class MOVAL(BaseEstimator):
         confidence_scores: str = "max_class_probability-conf",
         estim_algorithm: str = "ac-model",
         class_specific: bool = False, 
-        approximate: bool = False
+        approximate: bool = False, 
+        approximate_boundary: int = 30
     ):
         self.__dict__.update(locals())
 
@@ -126,7 +129,7 @@ class MOVAL(BaseEstimator):
                 )
 
         if self.mode == "segmentation" and self.approximate == True:
-            logits, gt = self.crop(logits, gt)
+            logits, gt = self.crop(logits = logits, gt = gt, approximate_boundary = self.approximate_boundary)
 
         solver.fit(logits, gt)
 
@@ -144,7 +147,7 @@ class MOVAL(BaseEstimator):
     def crop(self,
              logits: List[Iterable],
              gt: List[Iterable],
-             boundary = 30):
+             approximate_boundary):
         """Crop the image and label map to accelrate the optimization process.
         
         Here we do the cropping based on the label map (gt). We first find the bounding box and enlarge the region with boundary = 30 pixels.
@@ -152,6 +155,7 @@ class MOVAL(BaseEstimator):
         Args:
             logits: The network output (logits) of a list of n ``(d, H, W, (D))``. 
             gt: The cooresponding annotation of a list of n ``(H, W, (D))``.
+            approximate_boundary: The enlarged regions of the region to crop.
         
         Return:
             logits_post: The cropped network output (logits) of a list of n ``(d, H', W', (D'))``. 
@@ -169,11 +173,11 @@ class MOVAL(BaseEstimator):
                 border_x, border_y = gt_map.shape
                 ind_x, ind_y = np.where(gt_map != 0)
                 #
-                max_x = np.min((np.max(ind_x) + boundary, border_x))
-                min_x = np.max((np.min(ind_x) - boundary, 0))
+                max_x = np.min((np.max(ind_x) + approximate_boundary, border_x))
+                min_x = np.max((np.min(ind_x) - approximate_boundary, 0))
                 #
-                max_y = np.min((np.max(ind_y) + boundary, border_y))
-                min_y = np.max((np.min(ind_y) - boundary, 0))
+                max_y = np.min((np.max(ind_y) + approximate_boundary, border_y))
+                min_y = np.max((np.min(ind_y) - approximate_boundary, 0))
                 #
                 logits_post.append(logit_map[:, min_x:max_x, min_y:max_y])
                 gt_post.append(gt_map[min_x:max_x, min_y:max_y])
@@ -182,14 +186,14 @@ class MOVAL(BaseEstimator):
                 border_x, border_y, border_z = gt_map.shape
                 ind_x, ind_y, ind_z = np.where(gt_map != 0)
                 #
-                max_x = np.min((np.max(ind_x) + boundary, border_x))
-                min_x = np.max((np.min(ind_x) - boundary, 0))
+                max_x = np.min((np.max(ind_x) + approximate_boundary, border_x))
+                min_x = np.max((np.min(ind_x) - approximate_boundary, 0))
                 #
-                max_y = np.min((np.max(ind_y) + boundary, border_y))
-                min_y = np.max((np.min(ind_y) - boundary, 0))
+                max_y = np.min((np.max(ind_y) + approximate_boundary, border_y))
+                min_y = np.max((np.min(ind_y) - approximate_boundary, 0))
                 #
-                max_z = np.min((np.max(ind_z) + boundary, border_z))
-                min_z = np.max((np.min(ind_z) - boundary, 0))
+                max_z = np.min((np.max(ind_z) + approximate_boundary, border_z))
+                min_z = np.max((np.min(ind_z) - approximate_boundary, 0))
                 #
                 logits_post.append(logit_map[:, min_x:max_x, min_y:max_y, min_z:max_z])
                 gt_post.append(gt_map[min_x:max_x, min_y:max_y, min_z:max_z])
