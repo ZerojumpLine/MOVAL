@@ -20,6 +20,8 @@ class MOVAL(BaseEstimator):
             running :py:func:`moval.models.get_estim_options`. |Default:| ``ac``
         class_specific (bool):
             If ``True``, the calculation will match class-wise confidence to class-wise accuracy. |Default:| ``False``
+        approximate (bool):
+            If ``True``, we crop the image and label map to accelerate the optimization of segmentation. |Default:| ``False``
 
     Example:
         
@@ -39,7 +41,8 @@ class MOVAL(BaseEstimator):
         mode: str = "classification",
         confidence_scores: str = "max_class_probability-conf",
         estim_algorithm: str = "ac-model",
-        class_specific: bool = False
+        class_specific: bool = False, 
+        approximate: bool = False
     ):
         self.__dict__.update(locals())
 
@@ -52,7 +55,7 @@ class MOVAL(BaseEstimator):
 
         Args:
             inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
-            gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation
+            gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation.
         
         Return:
             ``self``
@@ -122,6 +125,9 @@ class MOVAL(BaseEstimator):
                     f"(dimension of GT, {len(gt[0].shape)})."
                 )
 
+        if self.mode == "segmentation" and self.approximate == True:
+            logits, gt = self.crop(logits, gt)
+
         solver.fit(logits, gt)
 
         #
@@ -133,6 +139,67 @@ class MOVAL(BaseEstimator):
             self.n_dim_ = len(logits[0].shape)
 
         return self
+
+    @classmethod
+    def crop(self,
+             logits: List[Iterable],
+             gt: List[Iterable],
+             boundary = 30):
+        """Crop the image and label map to accelrate the optimization process.
+        
+        Here we do the cropping based on the label map (gt). We first find the bounding box and enlarge the region with boundary = 30 pixels.
+
+        Args:
+            logits: The network output (logits) of a list of n ``(d, H, W, (D))``. 
+            gt: The cooresponding annotation of a list of n ``(H, W, (D))``.
+        
+        Return:
+            logits_post: The cropped network output (logits) of a list of n ``(d, H', W', (D'))``. 
+            gt_post: The cooresponding cropped annotation of a list of n ``(H', W', (D'))``.
+
+        """
+
+        logits_post = []
+        gt_post = []
+        for k_case in range(len(logits)):
+            logit_map = logits[k_case]
+            gt_map = gt[k_case]
+        
+        if len(gt_map.shape) == 2:
+            border_x, border_y = gt_map.shape
+            ind_x, ind_y = np.where(gt_map != 0)
+            #
+            max_x = np.min(np.max(ind_x) + boundary, border_x)
+            min_x = np.max(np.min(ind_x) - boundary, 0)
+            #
+            max_y = np.min(np.max(ind_y) + boundary, border_y)
+            min_y = np.max(np.min(ind_y) - boundary, 0)
+            #
+            logits_post.append(logit_map[:, min_x:max_x, min_y:max_y])
+            gt_post.append(gt_map[min_x:max_x, min_y:max_y])
+
+            return logits_post, gt_post
+        elif len(gt_map.shape) == 3:
+            border_x, border_y, border_z = gt_map.shape
+            ind_x, ind_y, ind_z = np.where(gt_map != 0)
+            #
+            max_x = np.min(np.max(ind_x) + boundary, border_x)
+            min_x = np.max(np.min(ind_x) - boundary, 0)
+            #
+            max_y = np.min(np.max(ind_y) + boundary, border_y)
+            min_y = np.max(np.min(ind_y) - boundary, 0)
+            #
+            max_z = np.min(np.max(ind_z) + boundary, border_z)
+            min_z = np.max(np.min(ind_z) - boundary, 0)
+            #
+            logits_post.append(logit_map[:, min_x:max_x, min_y:max_y, min_z:max_z])
+            gt_post.append(gt_map[min_x:max_x, min_y:max_y, min_z:max_z])
+            
+            return logits_post, gt_post
+        else:
+            raise ValueError("Not implemented!")
+        
+
     
     def estimate(self,
                  logits: Union[List[Iterable], np.ndarray]):

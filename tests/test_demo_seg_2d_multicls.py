@@ -198,8 +198,10 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
         pred_case   = np.argmax(logits_test[n_case], axis = 0) # ``(H, W, (D))``
         gt_case     = gt_test[n_case] # ``(H, W, (D))``
 
-        DSC = ComputMetric(pred_case == 1, gt_case == 1)
-        DSC_list_test.append(DSC)
+        DSC_c1 = ComputMetric(pred_case == 1, gt_case == 1)
+        DSC_c2 = ComputMetric(pred_case == 2, gt_case == 2)
+        DSC_c3 = ComputMetric(pred_case == 3, gt_case == 3)
+        DSC_list_test.append(np.array([DSC_c1, DSC_c2, DSC_c3]))
     m_DSC_test = np.mean(np.array(DSC_list_test))
 
     err_test = np.abs( m_DSC_test - estim_dsc_test )
