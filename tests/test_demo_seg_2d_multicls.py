@@ -62,6 +62,22 @@ for Imgname_eval in Imglist_eval_read:
     GT_read         = nib.load(GT_file)
     GTimg           = GT_read.get_fdata()           # ``(H, W, D)``
     #
+    logit_cls0      = logit_cls0[logit_cls0.shape[0] //2 - 30: logit_cls0.shape[0] //2 + 30,
+                                 logit_cls0.shape[1] //2 - 30: logit_cls0.shape[1] //2 + 30,
+                                 logit_cls0.shape[2] //2 - 15: logit_cls0.shape[2] //2 + 15]
+    logit_cls1      = logit_cls1[logit_cls1.shape[0] //2 - 30: logit_cls1.shape[0] //2 + 30,
+                                 logit_cls1.shape[1] //2 - 30: logit_cls1.shape[1] //2 + 30,
+                                 logit_cls1.shape[2] //2 - 15: logit_cls1.shape[2] //2 + 15]
+    logit_cls2      = logit_cls2[logit_cls2.shape[0] //2 - 30: logit_cls2.shape[0] //2 + 30,
+                                 logit_cls2.shape[1] //2 - 30: logit_cls2.shape[1] //2 + 30,
+                                 logit_cls2.shape[2] //2 - 15: logit_cls2.shape[2] //2 + 15]
+    logit_cls3      = logit_cls3[logit_cls3.shape[0] //2 - 30: logit_cls3.shape[0] //2 + 30,
+                                 logit_cls3.shape[1] //2 - 30: logit_cls3.shape[1] //2 + 30,
+                                 logit_cls3.shape[2] //2 - 15: logit_cls3.shape[2] //2 + 15]
+    #
+    GTimg           = GTimg[GTimg.shape[0] //2 - 30: GTimg.shape[0] //2 + 30,
+                            GTimg.shape[1] //2 - 30: GTimg.shape[1] //2 + 30,
+                            GTimg.shape[2] //2 - 15: GTimg.shape[2] //2 + 15]
     logit_cls = np.stack((logit_cls0, logit_cls1, logit_cls2, logit_cls3))  # ``(d, H, W, D)``
     # only including the slices that contains labels
     for dslice in range(GTimg.shape[2]):
