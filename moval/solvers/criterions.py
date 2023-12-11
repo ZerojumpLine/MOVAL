@@ -128,7 +128,10 @@ class segCalibrate(Calibrate):
 
                 dsc_case = np.zeros(inp[n_case].shape[0])
                 for kcls in range(1, inp[n_case].shape[0]):
-                    dsc_case[kcls] = ComputMetric(pred_case == kcls, gt_case == kcls)
+                    if np.sum(gt_case == kcls) == 0:
+                        dsc_case[kcls] = 0.
+                    else:
+                        dsc_case[kcls] = ComputMetric(pred_case == kcls, gt_case == kcls)
                 dsc.append(dsc_case)
 
             pred_all_flatten_bg = np.concatenate(pred_all_flatten_bg)

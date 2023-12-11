@@ -205,12 +205,15 @@ class Model(abc.ABC):
 
                 return normalized_scores
     
-    def __call__(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> float:
+    def __call__(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, gt: List[Iterable] = None) -> float:
         """Calculate the performance using network output.
 
         Args:
             inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
             midstage: If ``True``, return the first calibrated results.
+            gt: The cooresponding annotation of a list of n ``(H, W, (D))`` for segmentation. This is only rquired for segmentation task during optimizaing.
+                We will utilize this to determine if there is label in the case. If not, we do not calculate the dsc and utilize for optimizing.
+                This is because we do not want to optimize parameter with blank segmentation map.
         
         Returns:
             estim_acc: A float scalar that represents the estimated accuracy for the given input data.
@@ -267,6 +270,14 @@ class Model(abc.ABC):
                 score_filled = score_filled.reshape(((self.num_class,) + score_case.shape)) # ``(d, H, W, (D))``
                 #
                 estim_dsc = SoftDiceLoss(score_filled[np.newaxis, ...], pred_case[np.newaxis, ...])
+                #
+                if gt != None:
+                    gt_case = gt[n_case]
+                    # We remove the class DSC if there isn't any in gt
+                    for k_cls in range(len(estim_dsc)):
+                        if np.sum(gt_case == k_cls) == 0:
+                            estim_dsc[k_cls] = 0
+
                 estim_dsc_list.append(estim_dsc)
             m_estim_dsc = np.mean(np.array(estim_dsc_list), axis=0)
             

@@ -48,19 +48,20 @@ class Solver(abc.ABC):
             err: The caculated err taking x as input.
 
         """
+
         if not self.class_specific:
             self.model.param = x
             if self.model.extend_param:
-                estim_acc, estim_cls = self.model(self.inp, midstage = True)
+                estim_acc, estim_cls = self.model(self.inp, midstage = True, gt = self.gt_guide)
             else:
-                estim_acc, estim_cls = self.model(self.inp)
+                estim_acc, estim_cls = self.model(self.inp, gt = self.gt_guide)
             err = self.criterions(self.inp, self.gt, estim_acc)
         else:
             self.model.param[self.kcls] = x
             if self.model.extend_param:
-                estim_acc, estim_cls = self.model(self.inp, midstage = True)
+                estim_acc, estim_cls = self.model(self.inp, midstage = True, gt = self.gt_guide)
             else:
-                estim_acc, estim_cls = self.model(self.inp)
+                estim_acc, estim_cls = self.model(self.inp, gt = self.gt_guide)
             err = self.criterions(self.inp, self.gt, estim_cls)
             err = np.mean(err)
 
@@ -78,11 +79,11 @@ class Solver(abc.ABC):
         """
         if not self.class_specific:
             self.model.param_ext = x
-            estim_acc, estim_cls = self.model(self.inp)
+            estim_acc, estim_cls = self.model(self.inp, gt = self.gt_guide)
             err = self.criterions(self.inp, self.gt, estim_acc)
         else:
             self.model.param_ext[self.kcls] = x
-            estim_acc, estim_cls = self.model(self.inp)
+            estim_acc, estim_cls = self.model(self.inp, gt = self.gt_guide)
             err_cls = self.criterions(self.inp, self.gt, estim_cls)
             err = err_cls[self.kcls]
 
@@ -122,6 +123,10 @@ class Solver(abc.ABC):
 
         self.inp = inp
         self.gt = gt
+        if self.model.mode == "segmentation":
+            self.gt_guide = self.gt
+        else:
+            self.gt_guide = None
 
         self.model.train()
 

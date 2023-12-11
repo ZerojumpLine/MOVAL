@@ -136,7 +136,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
                 estim_algorithm = estim_algorithm,
                 class_specific = class_specific,
                 approximate = True,
-                approximate_boundary = 10
+                approximate_boundary = 30
                 )
 
     #
