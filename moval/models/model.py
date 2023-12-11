@@ -277,10 +277,16 @@ class Model(abc.ABC):
                     # We remove the class DSC if there isn't any in gt
                     for kcls in range(len(estim_dsc)):
                         if gt_case[kcls] is False:
-                            estim_dsc[kcls] = 0
+                            estim_dsc[kcls] = -1
 
                 estim_dsc_list.append(estim_dsc)
-            m_estim_dsc = np.mean(np.array(estim_dsc_list), axis=0)
+            
+            # only aggregate the ones which are not -1
+            estim_dsc_list = np.array(estim_dsc_list) # ``(n, d)``
+            m_estim_dsc = []
+            for kcls in range(len(estim_dsc)):
+                m_estim_dsc.append(estim_dsc_list[:, kcls][estim_dsc_list[:,kcls] > 0].mean())
+            m_estim_dsc = np.array(m_estim_dsc)
             
             return estim_acc, np.concatenate([np.array([estim_acc_bg]), m_estim_dsc[1:]])
         else:
