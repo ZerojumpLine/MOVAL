@@ -285,7 +285,7 @@ class Model(abc.ABC):
             estim_dsc_list = np.array(estim_dsc_list) # ``(n, d)``
             m_estim_dsc = []
             for kcls in range(len(estim_dsc)):
-                m_estim_dsc.append(estim_dsc_list[:, kcls][estim_dsc_list[:,kcls] > 0].mean())
+                m_estim_dsc.append(estim_dsc_list[:, kcls][estim_dsc_list[:,kcls] >= 0].mean())
             m_estim_dsc = np.array(m_estim_dsc)
             
             return estim_acc, np.concatenate([np.array([estim_acc_bg]), m_estim_dsc[1:]])

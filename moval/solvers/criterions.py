@@ -144,7 +144,9 @@ class segCalibrate(Calibrate):
             dsc_mean = []
             dsc_mean.append(0.)
             for kcls in range(1, inp[n_case].shape[0]):
-                dsc_mean.append(dsc[:, kcls][dsc[:,kcls] > 0].mean())
+                # I am not sure, if the real dsc is 0, I think the network cannot learn anything
+                # but any calculate this case in the estim, may we can improve here.
+                dsc_mean.append(dsc[:, kcls][dsc[:,kcls] >= 0].mean())
             dsc_mean = np.array(dsc_mean)
 
             err = estim - dsc_mean

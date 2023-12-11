@@ -169,7 +169,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
     m_DSC = []
     m_DSC.append(0.)
     for kcls in range(1, logits[n_case].shape[0]):
-        m_DSC.append(DSC_list[:, kcls][DSC_list[:,kcls] > 0].mean())
+        m_DSC.append(DSC_list[:, kcls][DSC_list[:,kcls] >= 0].mean())
 
     m_DSC = np.array(m_DSC)
     err_val_dsc = np.abs( m_DSC[1:] - estim_dsc )
@@ -206,7 +206,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
     m_DSC_test = []
     m_DSC_test.append(0.)
     for kcls in range(1, logits_test[n_case].shape[0]):
-        m_DSC_test.append(DSC_list_test[:, kcls][DSC_list_test[:,kcls] > 0].mean())
+        m_DSC_test.append(DSC_list_test[:, kcls][DSC_list_test[:,kcls] >= 0].mean())
 
     m_DSC_test = np.array(m_DSC_test)
     err_test = np.abs( m_DSC_test[1:] - estim_dsc_test )
