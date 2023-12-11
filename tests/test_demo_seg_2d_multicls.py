@@ -153,17 +153,27 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
     
     DSC_list = []
     for n_case in range(len(logits)):
-        pred_case   = np.argmax(logits[n_case], axis = 0) # ``(H, W, (D))``
-        gt_case     = gt[n_case] # ``(H, W, (D))``
+        pred_case   = np.argmax(logits[n_case], axis = 0) # ``(H', W', (D'))``
+        gt_case     = gt[n_case] # ``(H', W', (D'))``
 
-        DSC_c1 = ComputMetric(pred_case == 1, gt_case == 1)
-        DSC_c2 = ComputMetric(pred_case == 2, gt_case == 2)
-        DSC_c3 = ComputMetric(pred_case == 3, gt_case == 3)
-        DSC_list.append(np.array([DSC_c1, DSC_c2, DSC_c3]))
+        dsc_case = np.zeros(logits[n_case].shape[0])
+        for kcls in range(1, logits[n_case].shape[0]):
+            if np.sum(gt_case == kcls) == 0:
+                dsc_case[kcls] = -1
+            else:
+                dsc_case[kcls] = ComputMetric(pred_case == kcls, gt_case == kcls)
+        DSC_list.append(dsc_case)
+        
+    # only aggregate the ones which are not -1
+    DSC_list = np.array(DSC_list) # ``(n, d)``
+    m_DSC = []
+    m_DSC.append(0.)
+    for kcls in range(1, logits[n_case].shape[0]):
+        m_DSC.append(DSC_list[:, kcls][DSC_list[:,kcls] > 0].mean())
 
-    m_DSC = np.mean(np.array(DSC_list), axis=0)
-    
-    err_val_dsc = np.abs( m_DSC - estim_dsc )
+    m_DSC = np.array(m_DSC)
+    err_val_dsc = np.abs( m_DSC[1:] - estim_dsc )
+    #
 
     # save the test err in the result files.
     # the gt_guide for test data is optional
@@ -180,16 +190,26 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
 
     DSC_list_test = []
     for n_case in range(len(logits_test)):
-        pred_case   = np.argmax(logits_test[n_case], axis = 0) # ``(H, W, (D))``
-        gt_case     = gt_test[n_case] # ``(H, W, (D))``
+        pred_case   = np.argmax(logits_test[n_case], axis = 0) # ``(H', W', (D'))``
+        gt_case     = gt_test[n_case] # ``(H', W', (D'))``
 
-        DSC_c1 = ComputMetric(pred_case == 1, gt_case == 1)
-        DSC_c2 = ComputMetric(pred_case == 2, gt_case == 2)
-        DSC_c3 = ComputMetric(pred_case == 3, gt_case == 3)
-        DSC_list_test.append(np.array([DSC_c1, DSC_c2, DSC_c3]))
-    m_DSC_test = np.mean(np.array(DSC_list_test))
+        dsc_case = np.zeros(logits_test[n_case].shape[0])
+        for kcls in range(1, logits_test[n_case].shape[0]):
+            if np.sum(gt_case == kcls) == 0:
+                dsc_case[kcls] = -1
+            else:
+                dsc_case[kcls] = ComputMetric(pred_case == kcls, gt_case == kcls)
+        DSC_list_test.append(dsc_case)
+        
+    # only aggregate the ones which are not -1
+    DSC_list_test = np.array(DSC_list_test) # ``(n, d)``
+    m_DSC_test = []
+    m_DSC_test.append(0.)
+    for kcls in range(1, logits_test[n_case].shape[0]):
+        m_DSC_test.append(DSC_list_test[:, kcls][DSC_list_test[:,kcls] > 0].mean())
 
-    err_test = np.abs( m_DSC_test - estim_dsc_test )
+    m_DSC_test = np.array(m_DSC_test)
+    err_test = np.abs( m_DSC_test[1:] - estim_dsc_test )
 
     test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
 
