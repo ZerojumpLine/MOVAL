@@ -141,7 +141,15 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
 
     #
     moval_model.fit(logits, gt)
-    estim_dsc = moval_model.estimate(logits)
+    gt_guide = []
+    for n_case in range(len(logits)):
+        gt_case     = gt[n_case]
+        gt_exist = []
+        for k_cls in range(logit_cls[0].shape[0]):
+            gt_exist.append(np.sum(gt_case == k_cls) > 0)
+        gt_guide.append(gt_exist)
+    gt_guide = np.array(gt_guide)
+    estim_dsc = moval_model.estimate(logits, gt_guide = gt_guide)
     
     DSC_list = []
     for n_case in range(len(logits)):
@@ -158,8 +166,17 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
     err_val_dsc = np.abs( m_DSC - estim_dsc )
 
     # save the test err in the result files.
+    # the gt_guide for test data is optional
+    gt_guide_test = []
+    for n_case in range(len(logits_test)):
+        gt_case_test     = gt_test[n_case]
+        gt_exist_test = []
+        for k_cls in range(logit_cls[0].shape[0]):
+            gt_exist_test.append(np.sum(gt_case_test == k_cls) > 0)
+        gt_guide_test.append(gt_exist_test)
+    gt_guide_test = np.array(gt_guide_test)
 
-    estim_dsc_test = moval_model.estimate(logits_test)
+    estim_dsc_test = moval_model.estimate(logits_test, gt_guide = gt_guide_test)
 
     DSC_list_test = []
     for n_case in range(len(logits_test)):

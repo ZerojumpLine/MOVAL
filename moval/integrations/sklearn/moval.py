@@ -205,11 +205,14 @@ class MOVAL(BaseEstimator):
 
     
     def estimate(self,
-                 logits: Union[List[Iterable], np.ndarray]):
+                 logits: Union[List[Iterable], np.ndarray],
+                 gt_guide: np.ndarray = None):
         """Estimate model performance using logits.
 
         Args:
             logits: A numpy array of size ``(n, d)`` for classification or a list of n ``(d, H, W, (D))`` for segmentation.
+            gt_guide: A numpy array of size ``(n, d)`` for segmentation, indicating the existing of object d in sample n.
+                If ``False``, it means that there isn't any manuel label of class d in this sample.
         
         Returns:
             estim: estimated accuracy (float) for classification tasks, 
@@ -247,7 +250,7 @@ class MOVAL(BaseEstimator):
             estim_acc, estim_acc_allcls = model(logits)
             return estim_acc
         else:
-            estim_acc, estim_dsc = model(logits)
+            estim_acc, estim_dsc = model(logits, gt_guide = gt_guide)
             return estim_dsc[1:]
     
     def save(self, filename: str):
