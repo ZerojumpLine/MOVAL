@@ -323,7 +323,7 @@ class MOVAL(BaseEstimator):
                             mode = loaded_ckpt["mode"],
                             confidence_scores = loaded_ckpt["confidence_scores"],
                             estim_algorithm = loaded_ckpt["estim_algorithm"],
-                            class_specific = False
+                            class_specific = loaded_ckpt["class_specific"]
                             )
 
         model = moval.models.init(
