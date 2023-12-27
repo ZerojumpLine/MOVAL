@@ -285,6 +285,9 @@ class MOVAL(BaseEstimator):
         ckpt["n_dim_"] = self.n_dim_
         if self.model_.extend_param:
             ckpt["param_ext"] = self.model_.param_ext
+        if self.model_.conf.normalization:
+            ckpt["max_value"] = self.model_.max_value
+            ckpt["min_value"] = self.model_.min_value
 
         # Save the object as a pickle file
         with open(filename, 'wb') as file:
@@ -338,6 +341,10 @@ class MOVAL(BaseEstimator):
         if model.extend_param:
             model.param_ext = loaded_ckpt["param_ext"]
         
+        if model.conf.normalization:
+            model.max_value = loaded_ckpt["max_value"]
+            model.min_value = loaded_ckpt["min_value"]
+
         model.is_fitted = True
 
         moval_model.model_ = model
