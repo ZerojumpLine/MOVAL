@@ -60,7 +60,13 @@ class clsCalibrate(Calibrate):
             err = np.zeros(inp.shape[1])
             for kcls in range(inp.shape[1]):
                 pos_cls = np.where(pred == kcls)[0]
-                acc_cls = np.sum(gt[pos_cls] == pred[pos_cls]) / len(gt[pos_cls])
+
+                # if there do not exist any samplies for class kcls
+                if len(pos_cls) == 0:
+                    acc_cls = np.sum(gt == pred) / len(gt)
+                else:
+                    acc_cls = np.sum(gt[pos_cls] == pred[pos_cls]) / len(gt[pos_cls])
+                
                 err[kcls] = estim[kcls] - acc_cls
 
         return np.abs(err)
