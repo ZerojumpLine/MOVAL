@@ -1,14 +1,18 @@
+from sklearn.metrics import auc, roc_curve
+from moval.models.utils import one_hot_embedding
 import numpy as np
 
 def ComputMetric(ACTUAL: np.ndarray, PREDICTED: np.ndarray) -> float:
-    """Caculate the DSC between prediction and the GT.
+    """Calculate the DSC (F1-Score), sensitivity and precision between prediction and the GT.
 
     Args:
-        PREDICTED: The predicted segmentation map of shape ``((n), H, W, (D))`.`
-        ACTUAL: The ground truth segmentation map of shape ``((n), H, W, (D))`.
+        PREDICTED: The predicted segmentation map of shape ``(H, W, (D))`` or predicted classification results of shape ``(n, )``.
+        ACTUAL: The ground truth segmentation map of shape ``(H, W, (D))`` or predicted classification results of shape ``(n, )``.
 
     Returns:
         dice: A float scalar which represents the calculated dice score.
+        sensitivity: A float scalar which represents the calculated sensitivity score.
+        precision: A float scalar which represents the calculated precision score.
     
     """
     ACTUAL = ACTUAL.flatten()
@@ -22,6 +26,46 @@ def ComputMetric(ACTUAL: np.ndarray, PREDICTED: np.ndarray) -> float:
     fn = np.sum(idxp) - tp
     if tp == 0 :
         dice = 0
+        sensitivity = 0
+        precision = 0
     else:
         dice = 2 * tp / (2 * tp + fp + fn)
-    return dice
+        precision = tp / (tp + fp)
+        sensitivity = tp / (tp + fn)
+    return dice, sensitivity, precision
+
+# AUC calculation here.
+def ComputAUC(ACTUAL: np.ndarray, PROBABILITY: np.ndarray) -> float:
+    """Calculate the AUC.
+
+    Note:
+        When dealing with multi-class AUC, we calculate the One-vs-Rest strategy for simplicity.
+        More information could refer to https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html.
+        It is not used in the framework of MOVAL, but could be useful to validate moval's performance.
+
+    Args:
+        PROBABILITY: The predicted probability of shape ``(d, H, W, (D))`` or predicted classification results of shape ``(n, d)``.
+        ACTUAL: The ground truth segmentation map of shape ``(H, W, (D))`` or predicted classification results of shape ``(n, )``.
+    
+    Returns:
+        AUCs: The calculate class-wise AUC of shape ``(d, )``.
+    
+    """
+
+    ACTUAL = ACTUAL.flatten() # ``(n, )``
+    if len(PROBABILITY.shape) > 2:
+        # from ``(d, H, W, (D))`` to ``(n, d)``
+        d, *rest_of_dimensions = PROBABILITY.shape
+        flatten_dim = np.prod(rest_of_dimensions)
+        PROBABILITY = PROBABILITY.reshape((d, flatten_dim))
+        PROBABILITY = PROBABILITY.T
+
+    y_onehot_test = one_hot_embedding(ACTUAL, PROBABILITY.shape[1])
+    fpr, tpr, roc_auc = dict(), dict(), dict()
+    for i in range(PROBABILITY.shape[1]):
+        
+        fpr[i], tpr[i], _ = roc_curve(y_onehot_test[:, i], PROBABILITY[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    return np.array(list(roc_auc.values()))
+

@@ -123,6 +123,7 @@ class Solver(abc.ABC):
 
         self.inp = inp
         self.gt = gt
+        # generate gt_guide from gt here.
         if self.model.mode == "segmentation":
             gt_guide = []
             for n_case in range(len(gt)):

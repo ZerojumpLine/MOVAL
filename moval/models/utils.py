@@ -2,7 +2,7 @@ from typing import Callable, Iterable, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 
-def cal_softmax(x, T = 1, e1 = 1e-6) -> np.ndarray:
+def cal_softmax(x: np.ndarray, T = 1, e1 = 1e-6) -> np.ndarray:
     """Compute softmax values for each sets of scores in x.
     
     Args:
@@ -21,7 +21,7 @@ def cal_softmax(x, T = 1, e1 = 1e-6) -> np.ndarray:
 
     return prob.transpose()
 
-def cal_energy(x, T = 1) -> np.ndarray:
+def cal_energy(x: np.ndarray, T = 1) -> np.ndarray:
     """Compute energy values for each sets of scores in x.
 
     Calculating based on the defination as described in:
@@ -45,7 +45,7 @@ def cal_energy(x, T = 1) -> np.ndarray:
 
     return energy
 
-def cal_mcp(x, T = 1) -> np.ndarray:
+def cal_mcp(x: np.ndarray, T = 1) -> np.ndarray:
     """Compute maximum class probability (MCP) for each sets of scores in x.
     
     Args:
@@ -61,7 +61,7 @@ def cal_mcp(x, T = 1) -> np.ndarray:
 
     return MCP
 
-def cal_entropy(x, T = 1, e1 = 1e-6) -> np.ndarray:
+def cal_entropy(x: np.ndarray, T = 1, e1 = 1e-6) -> np.ndarray:
     """Compute entropy values for each sets of scores in x.
 
     Note:
@@ -82,7 +82,7 @@ def cal_entropy(x, T = 1, e1 = 1e-6) -> np.ndarray:
 
     return entropy
 
-def cal_doctor(x, T = 1) -> np.ndarray:
+def cal_doctor(x: np.ndarray, T = 1) -> np.ndarray:
     """Compute engery values for each sets of scores in x.
 
     Calculating based on the defination as described in:
@@ -107,7 +107,7 @@ def cal_doctor(x, T = 1) -> np.ndarray:
 
     return doctor
 
-def sum_tensor(inp, axes, keepdims=False) -> np.ndarray:
+def sum_tensor(inp: np.ndarray, axes: np.ndarray, keepdims=False) -> np.ndarray:
     axes = np.unique(axes).astype(int)
     if keepdims:
         for ax in axes:
@@ -117,12 +117,12 @@ def sum_tensor(inp, axes, keepdims=False) -> np.ndarray:
             inp = inp.sum(int(ax))
     return inp
 
-def get_tp_fp_fn(net_output, gt, axes=None, square=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def get_tp_fp_fn(net_output: np.ndarray, gt: np.ndarray, axes=None, square=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate the true positive (tp), false positive (fp) and false negative (fn).
 
     Args:
-        net_output: The network output (logits) of shape ``(n, d, H, W, (D))``.
-        gt: The manual label of shape ``(n, H, W, (D))``.
+        net_output: The predicted probability of shape ``(n, d, (H), (W), (D))``.
+        gt: The manual label of shape ``(n, (H), (W), (D))``.
         axes: We average the axes of features. This is useful if we want to return case-wise soft dice score.
         square: Indicate if we want to include the square term in tp etc, which could be more stable.
     
@@ -133,7 +133,7 @@ def get_tp_fp_fn(net_output, gt, axes=None, square=False) -> Tuple[np.ndarray, n
 
     """
     if axes is None:
-        axes = tuple(range(2, len(net_output.size())))
+        axes = tuple(range(2, len(net_output.shape)))
 
     shp_x = net_output.shape
     shp_y = gt.shape
@@ -155,18 +155,17 @@ def get_tp_fp_fn(net_output, gt, axes=None, square=False) -> Tuple[np.ndarray, n
 
     return tp, fp, fn
 
-
-def SoftDiceLoss(x, y, smooth = 1e-5) -> np.ndarray:
-    '''Calculation of soft dice score.
+def SoftDiceLoss(x: np.ndarray, y: np.ndarray, smooth = 1e-5) -> np.ndarray:
+    """Calculation of soft dice score / F1 score.
 
     Args:
-        x: The network output (logits) of shape ``(n, d, H, W, (D))``.
-        y: The manual label of shape ``(n, H, W, (D))``.
+        x: The predicted probability of shape ``(n, d, (H), (W), (D))``.
+        y: The manual label of shape ``(n, (H), (W), (D))``.
     
     Returns:
         dice_score: Average class-wise dice of shape ``(d, )``
 
-    '''
+    """
     assert len(x.shape) == len(y.shape) + 1
 
     shp_x = x.shape
@@ -179,8 +178,125 @@ def SoftDiceLoss(x, y, smooth = 1e-5) -> np.ndarray:
 
     return dc_process
 
+def SoftSensitivity(x: np.ndarray, y: np.ndarray, smooth = 1e-5) -> np.ndarray:
+    """Calculation of soft sensitivity.
+
+    Args:
+        x: The predicted probability of shape ``(n, d, (H), (W), (D))``.
+        y: The manual label of shape ``(n, (H), (W), (D))``.
+    
+    Returns:
+        dice_score: Average class-wise dice of shape ``(d, )``
+
+    """
+    assert len(x.shape) == len(y.shape) + 1
+
+    shp_x = x.shape
+    square = False
+
+    axes = [0] + list(range(2, len(shp_x)))
+    tp, fp, fn = get_tp_fp_fn(x, y, axes, square)
+    sensitivity = (tp + smooth) / (tp + fn + smooth)
+
+    return sensitivity
+
+def SoftPrecision(x: np.ndarray, y: np.ndarray, smooth = 1e-5) -> np.ndarray:
+    """Calculation of soft precision score.
+
+    Args:
+        x: The predicted probability of shape ``(n, d, (H), (W), (D))``.
+        y: The manual label of shape ``(n, (H), (W), (D))``.
+    
+    Returns:
+        dice_score: Average class-wise dice of shape ``(d, )``
+
+    """
+    assert len(x.shape) == len(y.shape) + 1
+
+    shp_x = x.shape
+    square = False
+
+    axes = [0] + list(range(2, len(shp_x)))
+    tp, fp, fn = get_tp_fp_fn(x, y, axes, square)
+    precision = (tp + smooth) / (tp + fp + smooth)
+
+    return precision
+
+def SoftAUC(x: np.ndarray) -> np.ndarray:
+    """Calculate the estimated AUC given the probability.
+    
+    Note:
+        When dealing with multi-class AUC, we calculate the One-vs-Rest strategy for simplicity.
+        More information could refer to https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html.
+        Similar strategy is adopted in https://nannyml.readthedocs.io/en/stable/how_it_works/performance_estimation.html.
+    
+    Args:
+        x: The predicted probability of shape ``(n, d, (H), (W), (D))``.
+
+    Returns:
+        AUCs: Estimated class-wise AUC of shape ``(d, )``.
+        TPRall: A list of d true positive rates for different classes.
+        FPRall: A list of d false positive rates for different classes.
+
+    """
+    
+    thresholds = [0.00001, 0.0001, 0.001, 0.01, 0.05, 
+                  0.1, 0.2, 0.3, 0.4, 0.5, 
+                  0.6, 0.7, 0.8, 0.9, 0.95, 
+                  0.99, 0.999, 0.9999, 0.99999]
+    
+    y = np.argmax(x, axis = 1) # this is not important, just a placeholder of shape ``(n, (H), (W), (D))``
+    shp_x = x.shape
+    square = False
+    axes = [0] + list(range(2, len(shp_x)))
+    #
+    AUCs = []
+    TPRall = []
+    FPRall = []
+    for test_cls in range(x.shape[1]):
+        # low thres -> high FPR -> high sensitivity (TPR)
+        # obtain TPRs and FPRs
+        TPRs = []
+        FPRs = []
+        #
+        TPRs.append(0.)
+        FPRs.append(0.)
+        for thres in thresholds:
+            cls_choice = list(range(x.shape[1]))
+            cls_choice.remove(test_cls)
+            y[y == test_cls] = cls_choice[0] # remove all samples that predicted as ``test_cls``
+            #
+            mask = x[:, test_cls] > thres
+            y[mask, ...] = test_cls # overwrite the prediction based on given threshold
+            #
+            # I only need to make sure y[y_cls == True] is correct, and ``test_cls`` does not appear otherwhere
+
+            tp, fp, fn = get_tp_fp_fn(x, y, axes, square)
+
+            TPR = tp[test_cls] / np.sum(y == test_cls)
+            FPR = fp[test_cls] / np.sum(y != test_cls)
+
+            TPRs.append(TPR)
+            FPRs.append(FPR)
+        TPRs.append(1.)
+        FPRs.append(1.)
+        # calculate AUC
+        AUC = 0
+        for k_thres in range(len(TPRs) - 1):
+            TPR_left = TPRs[k_thres]
+            TPR_right = TPRs[k_thres + 1]
+            FPR_left = FPRs[k_thres]
+            FPR_right = FPRs[k_thres + 1]
+            AUC_k = (FPR_right - FPR_left) * (TPR_left + TPR_right) / 2
+            AUC = AUC + AUC_k
+        AUCs.append(AUC)
+        TPRall.append(TPRs)
+        FPRall.append(FPRs)
+    
+    return np.array(AUCs), TPRall, FPRall
+
 def one_hot_embedding(labels: np.ndarray, num_class: int) -> np.ndarray:
-    '''Embedding labels to one-hot form.
+    """Embedding labels to one-hot form.
 
     Args:
         labels: The label map of shape ``(n, )`` or ``(n, H, W, (D))``.
@@ -189,7 +305,7 @@ def one_hot_embedding(labels: np.ndarray, num_class: int) -> np.ndarray:
     Returns:
         labels_onehot: The transformed onehot label map of shape ``(n, d)`` or ``(n, d, H, W, (D))``.
     
-    '''
+    """
     y = np.eye(num_class)[labels.reshape(-1).astype(int)]  # of shape `(n * H * W (*D), d)`
     labels_onehot = y.reshape(list(labels.shape)+[num_class]) # of shape `(n, H, W, (D), d)`
 

@@ -1,10 +1,10 @@
 import abc
 from typing import Callable, Iterable, List, Literal, Optional, Tuple, Union
 import numpy as np
-from typing import Any
 from moval.models import register
 import moval.models
-from moval.models.utils import SoftDiceLoss
+from moval.models.utils import SoftDiceLoss, SoftSensitivity, SoftPrecision, SoftAUC, cal_softmax
+from moval.models.solver_temperature import solve_T
 
 class Model(abc.ABC):
     """Base model for MOVAL experiments.
@@ -125,7 +125,7 @@ class Model(abc.ABC):
             self.min_value = np.min(scores)
 
     def _normalize(self, scores: Union[List[Iterable], np.ndarray], lb: np.ndarray = None, pred: np.ndarray = None, e1: float = 1e-6) -> Union[List[Iterable], np.ndarray]:
-        """Normalize the confidence scores to [(1-self.param), 1] if the score is not bounded.
+        """Normalize the confidence scores to [1 - lb, 1] if the score is not bounded.
 
         Note:
             This replace the temperature scaling process of this confidence scores, e.g., doctor, energy.
@@ -172,12 +172,12 @@ class Model(abc.ABC):
                     # pred now is of shape ``(n, )``
 
                     if not self.class_specific:
-                        normalized_score = normalized_score * self.param + (1 - self.param)
+                        normalized_score = normalized_score * lb + (1 - lb)
                     else:
                         # class-wise average confidence
                         for kcls in range(self.num_class):
                             pos_cls = np.where(pred_case == kcls)[0]
-                            normalized_score[pos_cls] = normalized_score[pos_cls] * self.param[kcls] + (1 - self.param[kcls])
+                            normalized_score[pos_cls] = normalized_score[pos_cls] * lb[kcls] + (1 - lb[kcls])
                     
                     normalized_score = normalized_score.reshape(inp_shape)
 
@@ -196,16 +196,16 @@ class Model(abc.ABC):
                 # pred now is of shape ``(n, )``
 
                 if not self.class_specific:
-                    normalized_scores = normalized_scores * self.param + (1 - self.param)
+                    normalized_scores = normalized_scores * lb + (1 - lb)
                 else:
                     # class-wise average confidence
                     for kcls in range(self.num_class):
                         pos_cls = np.where(pred == kcls)[0]
-                        normalized_scores[pos_cls] = normalized_scores[pos_cls] * self.param[kcls] + (1 - self.param[kcls])
+                        normalized_scores[pos_cls] = normalized_scores[pos_cls] * lb[kcls] + (1 - lb[kcls])
 
                 return normalized_scores
     
-    def __call__(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, gt_guide: np.ndarray = None) -> float:
+    def __call__(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
         """Calculate the performance using network output.
 
         Args:
@@ -258,17 +258,15 @@ class Model(abc.ABC):
             estim_acc_bg = np.mean( np.concatenate(scores_bg) )
             
             # Note, the calculation of dice score need the probability of non-maximum classes 
-            # here we extend score from shape ``(n, H, W, (D))`` to ``(n, d, H, W, (D))``, the other dimension are just filled with zeros
+            # Therefore, here we calculate the probability calculation function
             estim_dsc_list = []
+            if self.extend_param:
+                probability = self.calculate_probability(inp, midstage)
+            else:
+                probability = self.calculate_probability(inp)
             for n_case in range(len(inp)):
                 pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
-                pred_flatten = pred_case.flatten() # ``n``
-                score_case = score[n_case] # ``(H, W, (D))``
-                score_flatten = score[n_case].flatten() # ``n``
-                score_filled = np.zeros((score_flatten.shape + (self.num_class,))) # ``(n, d)``
-                score_filled[np.arange(score_filled.shape[0]), pred_flatten] = score_flatten # ``(n, d)``
-                score_filled = score_filled.T # ``(d, n)``
-                score_filled = score_filled.reshape(((self.num_class,) + score_case.shape)) # ``(d, H, W, (D))``
+                score_filled = probability[n_case]
                 #
                 estim_dsc = SoftDiceLoss(score_filled[np.newaxis, ...], pred_case[np.newaxis, ...])
                 #
@@ -292,18 +290,291 @@ class Model(abc.ABC):
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
 
-    def calibrate(self, scores: Union[List[Iterable], np.ndarray]) -> Union[List[Iterable], np.ndarray]:
+    def estimate_sensitivity(self, inp: Union[List[Iterable], np.ndarray], probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
+        """Esimate the sensitivity using network output.
+
+        Args:
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            probability: The calibrated probability of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            gt_guide: The cooresponding annotation guide of shape ``(n, d)`` for segmentation. This is only rquired for segmentation task during optimizaing.
+                We will utilize this to determine if there is label in the case. If not, we do not calculate the dsc and utilize for optimizing.
+                This is because we do not want to optimize parameter with blank segmentation map. 
+                This should be bool, if ``False``, it means that there isn't any manuel label of class d in this sample.
+        
+        Note:
+            The user may wonder why we need inp here in this function. It is because we utilize inp to determine the prediction results, which are not always feasible by probability.
+
+        Returns:
+            estim_sensitivity: Estimated class-wise sensitivity of shape ``(d, )``.
+
+        """
+
+        # Estimate the sensitivity.
+        if self.mode == "classification":
+            # probability is of shape ``(n, d)``
+            estim_sensitivity = SoftSensitivity(probability, np.argmax(probability, axis = 1))
+            return estim_sensitivity
+        elif self.mode == "segmentation":
+            # probability is a list of n ``(d, H, W, (D))``.
+            estim_sensitivity_list = []
+            for n_case in range(len(inp)):
+                pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
+                score_filled = probability[n_case] # ``(d, H, W, (D))``
+                #
+                estim_sensitivity = SoftSensitivity(score_filled[np.newaxis, ...], pred_case[np.newaxis, ...])
+                #
+                if isinstance(gt_guide, np.ndarray):
+                    gt_case = gt_guide[n_case]
+                    # We remove the class DSC if there isn't any in gt
+                    for kcls in range(len(estim_sensitivity)):
+                        if gt_case[kcls] is False:
+                            estim_sensitivity[kcls] = -1
+
+                estim_sensitivity_list.append(estim_sensitivity)
+            
+            # aggregate the results
+            estim_sensitivity_list = np.array(estim_sensitivity_list) # ``(n, d)``
+            m_estim_sensitivity = []
+            for kcls in range(len(estim_sensitivity)):
+                m_estim_sensitivity.append(estim_sensitivity_list[:, kcls][estim_sensitivity_list[:,kcls] >= 0].mean())
+            
+            return np.array(m_estim_sensitivity)
+        else:
+            raise ValueError(f"Unknown mode '{self.mode}'")
+    
+    def estimate_precision(self, probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
+        """Esimate the precision using network output.
+
+        Args:
+            probability: The calibrated probability of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            gt_guide: The cooresponding annotation guide of shape ``(n, d)`` for segmentation. This is only rquired for segmentation task during optimizaing.
+                We will utilize this to determine if there is label in the case. If not, we do not calculate the dsc and utilize for optimizing.
+                This is because we do not want to optimize parameter with blank segmentation map. 
+                This should be bool, if ``False``, it means that there isn't any manuel label of class d in this sample.
+        
+        Returns:
+            estim_precision: Estimated class-wise precision of shape ``(d, )``.
+
+        """
+
+        if self.estim_algorithm == "atc-model" or self.estim_algorithm == "ts-atc-model":
+            raise ValueError(f"estimation algorithm '{self.estim_algorithm}' does not support the estimation of precision (because FP is always 0)")
+
+        # Estimate the sensitivity.
+        if self.mode == "classification":
+            # probability is of shape ``(n, d)``
+            estim_precision = SoftPrecision(probability, np.argmax(probability, axis = 1))
+            return estim_precision
+        elif self.mode == "segmentation":
+            # probability is a list of n ``(d, H, W, (D))``.
+            estim_precision_list = []
+            for n_case in range(len(probability)):
+                pred_case = np.argmax(probability[n_case], axis = 0) # ``(H, W, (D))``
+                score_filled = probability[n_case] # ``(d, H, W, (D))``
+                #
+                estim_precision = SoftPrecision(score_filled[np.newaxis, ...], pred_case[np.newaxis, ...])
+                #
+                if isinstance(gt_guide, np.ndarray):
+                    gt_case = gt_guide[n_case]
+                    # We remove the class DSC if there isn't any in gt
+                    for kcls in range(len(estim_precision)):
+                        if gt_case[kcls] is False:
+                            estim_precision[kcls] = -1
+
+                estim_precision_list.append(estim_precision)
+            
+            # aggregate the results
+            estim_precision_list = np.array(estim_precision_list) # ``(n, d)``
+            m_estim_precision = []
+            for kcls in range(len(estim_precision)):
+                m_estim_precision.append(estim_precision_list[:, kcls][estim_precision_list[:,kcls] >= 0].mean())
+            
+            return np.array(m_estim_precision)
+        else:
+            raise ValueError(f"Unknown mode '{self.mode}'")
+    
+    def estimate_F1score(self, inp: Union[List[Iterable], np.ndarray], probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
+        """Esimate the F1score using network output.
+
+        Args:
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            probability: The calibrated probability of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            gt_guide: The cooresponding annotation guide of shape ``(n, d)`` for segmentation. This is only rquired for segmentation task during optimizaing.
+                We will utilize this to determine if there is label in the case. If not, we do not calculate the dsc and utilize for optimizing.
+                This is because we do not want to optimize parameter with blank segmentation map. 
+                This should be bool, if ``False``, it means that there isn't any manuel label of class d in this sample.
+        
+        Returns:
+            estim_F1score: Estimated class-wise F1score of shape ``(d, )``.
+
+        """
+
+        # Estimate the sensitivity.
+        if self.mode == "classification":
+            # probability is of shape ``(n, d)``
+            estim_F1score = SoftDiceLoss(probability, np.argmax(probability, axis = 1))
+            return estim_F1score
+        elif self.mode == "segmentation":
+            # probability is a list of n ``(d, H, W, (D))``.
+            estim_dsc_list = []
+            for n_case in range(len(inp)):
+                pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
+                score_filled = probability[n_case] # ``(d, H, W, (D))``
+                #
+                estim_dsc = SoftDiceLoss(score_filled[np.newaxis, ...], pred_case[np.newaxis, ...])
+                #
+                if isinstance(gt_guide, np.ndarray):
+                    gt_case = gt_guide[n_case]
+                    # We remove the class DSC if there isn't any in gt
+                    for kcls in range(len(estim_dsc)):
+                        if gt_case[kcls] is False:
+                            estim_dsc[kcls] = -1
+
+                estim_dsc_list.append(estim_dsc)
+            
+            # aggregate the results
+            estim_dsc_list = np.array(estim_dsc_list) # ``(n, d)``
+            m_estim_dsc = []
+            for kcls in range(len(estim_dsc)):
+                m_estim_dsc.append(estim_dsc_list[:, kcls][estim_dsc_list[:,kcls] >= 0].mean())
+            
+            return np.array(m_estim_dsc)
+        else:
+            raise ValueError(f"Unknown mode '{self.mode}'")
+    
+    def estimate_AUC(self, probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
+        """Esimate the AUC using network output.
+
+        Args:
+            probability: The calibrated probability of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            gt_guide: The cooresponding annotation guide of shape ``(n, d)`` for segmentation. This is only rquired for segmentation task during optimizaing.
+                We will utilize this to determine if there is label in the case. If not, we do not calculate the dsc and utilize for optimizing.
+                This is because we do not want to optimize parameter with blank segmentation map. 
+                This should be bool, if ``False``, it means that there isn't any manuel label of class d in this sample.
+        
+        Returns:
+            estim_AUC: Estimated class-wise AUC of shape ``(d, )``.
+
+        """
+
+        if self.estim_algorithm == "atc-model" or self.estim_algorithm == "ts-atc-model":
+            raise ValueError(f"estimation algorithm '{self.estim_algorithm}' does not support the estimation of AUC (because FP is always 0)")
+
+        # Estimate the sensitivity.
+        if self.mode == "classification":
+            # probability is of shape ``(n, d)``
+            estim_AUC = SoftAUC(probability)
+            return estim_AUC
+        elif self.mode == "segmentation":
+            # probability is a list of n ``(d, H, W, (D))``.
+            estim_AUC_list = []
+            for n_case in range(len(probability)):
+                score_filled = probability[n_case] # ``(d, H, W, (D))``
+                #
+                estim_AUC = SoftAUC(score_filled[np.newaxis, ...])
+                #
+                if isinstance(gt_guide, np.ndarray):
+                    gt_case = gt_guide[n_case]
+                    # We remove the class DSC if there isn't any in gt
+                    for kcls in range(len(estim_AUC)):
+                        if gt_case[kcls] is False:
+                            estim_AUC[kcls] = -1
+
+                estim_AUC_list.append(estim_AUC)
+            
+            # aggregate the results
+            estim_AUC_list = np.array(estim_AUC_list) # ``(n, d)``
+            m_estim_auc = []
+            for kcls in range(len(estim_AUC)):
+                m_estim_auc.append(estim_AUC_list[:, kcls][estim_AUC_list[:,kcls] >= 0].mean())
+            
+            return np.array(m_estim_auc)
+        else:
+            raise ValueError(f"Unknown mode '{self.mode}'")
+
+    def calibrate(self, inp: Union[List[Iterable], np.ndarray]) -> Union[List[Iterable], np.ndarray]:
         """Calibrate the confidence scores with parameters.
 
         Different estimation algorithms would adopt different strateiges to calibrate the scores.
-
-        Returns:
-            calibrated_scores: The calibrated scores which would match the accuracy/DSC on validation data.
         
         """
         
         raise NotImplementedError()
+    
+    def calculate_probability(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> Union[List[Iterable], np.ndarray]:
+        """Calculate the calibrated probability with parameters.
+        The challenge is the calculation of non-maximum probability. 
+        To achieve this, we calculate the pseudo-temperature for each samples such that the confidence score match the max probability after the temperature scaling process.
+        Then, we utilize the pseudo-temperature to scale the probabilities of other classes.
 
+        Note:
+            The calibrated probability should have the same dimension with network outputs.
+
+        Args:
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            midstage: If ``True``, return the first calibrated results.
+
+        Returns:
+            calibrated_probability: The calibrated probability which would match the accuracy/DSC on validation data, of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+        
+        """
+
+        if self.extend_param:
+            score = self.calibrate(inp, midstage)
+        else:
+            score = self.calibrate(inp)
+            
+        if self.mode == "classification":
+            # extend from ``(n, )`` to ``(n, d)``
+            if self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
+                # ATC cannot get the calibrated probability of all classes, we just fill the other dimension with zeros
+                pred_flatten = np.argmax(inp, axis = 1)
+                probability = np.zeros((score.shape + (self.num_class,))) # ``(n, d)``
+                probability[np.arange(probability.shape[0]), pred_flatten] = score # ``(n, d)``
+            else:
+                T = solve_T(inp, score) # return T of shape ``(n, )``
+
+                probability = np.zeros((score.shape + (self.num_class,))) # ``(n, d)``
+                for ksample in range(len(score)):
+                    probability[ksample, :] = cal_softmax(inp, T[ksample])
+
+
+        elif self.mode == "segmentation":
+            # extend from a list of n ``(H, W, (D))`` to a list of n ``(d, H, W, (D))``
+            if self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
+                # ATC cannot get the calibrated probability of all classes, we just fill the other dimension with zeros
+                probability = []
+                for n_case in range(len(inp)):
+                    pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
+                    #
+                    pred_flatten = pred_case.flatten() # ``n``
+                    score_case = score[n_case] # ``(H, W, (D))``
+                    score_flatten = score[n_case].flatten() # ``n``
+                    probability_case = np.zeros((score_flatten.shape + (self.num_class,))) # ``(n, d)``
+                    probability_case[np.arange(probability_case.shape[0]), pred_flatten] = score_flatten # ``(n, d)``
+                    probability_case = probability_case.T # ``(d, n)``
+                    probability_case = probability_case.reshape(((self.num_class,) + score_case.shape)) # ``(d, H, W, (D))``
+                    probability.append(probability_case)
+            else:
+                probability = []
+                for n_case in range(len(inp)):
+                    score_case = score[n_case] # ``(H, W, (D))``
+                    score_flatten = score[n_case].flatten() # ``n``
+                    inp_case = inp[n_case] # ``(d, H, W, (D))``
+                    inp_case = inp_case.reshape(((self.num_class, len(score_flatten)))) # ``(d, n)``
+                    inp_case = inp_case.T # ``(n, d)``
+                    T = solve_T(inp_case, score_flatten) # return T of shape ``(n, )``
+                    probability_case = np.zeros((score_flatten.shape + (self.num_class,))) # ``(n, d)``
+                    for ksample in range(len(score)):
+                        probability_case[ksample, :] = cal_softmax(inp_case, T[ksample]) # ``(n, d)``
+                    probability_case = probability_case.T # ``(d, n)``
+                    probability_case = probability_case.reshape(((self.num_class,) + score_case.shape)) # ``(d, H, W, (D))``
+                    probability.append(probability_case)
+
+        else:
+            raise ValueError(f"Unknown mode '{self.mode}'")
+        
+        raise probability
 
 @register("ac-model")
 class acModel(Model):

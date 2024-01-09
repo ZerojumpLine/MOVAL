@@ -161,7 +161,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
             if np.sum(gt_case == kcls) == 0:
                 dsc_case[kcls] = -1
             else:
-                dsc_case[kcls] = ComputMetric(pred_case == kcls, gt_case == kcls)
+                dsc_case[kcls], _, _ = ComputMetric(pred_case == kcls, gt_case == kcls)
         DSC_list.append(dsc_case)
         
     # only aggregate the ones which are not -1
@@ -198,7 +198,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
             if np.sum(gt_case == kcls) == 0:
                 dsc_case[kcls] = -1
             else:
-                dsc_case[kcls] = ComputMetric(pred_case == kcls, gt_case == kcls)
+                dsc_case[kcls], _, _ = ComputMetric(pred_case == kcls, gt_case == kcls)
         DSC_list_test.append(dsc_case)
         
     # only aggregate the ones which are not -1

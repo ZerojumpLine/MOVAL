@@ -136,7 +136,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
         pred_case   = np.argmax(logits[n_case], axis = 0) # ``(H, W, (D))``
         gt_case     = gt[n_case] # ``(H, W, (D))``
 
-        DSC = ComputMetric(pred_case == 1, gt_case == 1)
+        DSC, _, _ = ComputMetric(pred_case == 1, gt_case == 1)
         DSC_list.append(DSC)
     m_DSC = np.mean(np.array(DSC_list))
     
@@ -151,7 +151,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
         pred_case   = np.argmax(logits_test[n_case], axis = 0) # ``(H, W, (D))``
         gt_case     = gt_test[n_case] # ``(H, W, (D))``
 
-        DSC = ComputMetric(pred_case == 1, gt_case == 1)
+        DSC, _, _ = ComputMetric(pred_case == 1, gt_case == 1)
         DSC_list_test.append(DSC)
     m_DSC_test = np.mean(np.array(DSC_list_test))
 
