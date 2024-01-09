@@ -536,7 +536,7 @@ class Model(abc.ABC):
 
                 probability = np.zeros((score.shape + (self.num_class,))) # ``(n, d)``
                 for ksample in range(len(score)):
-                    probability[ksample, :] = cal_softmax(inp, T[ksample])
+                    probability[ksample, :] = cal_softmax(inp[ksample, :], T[ksample])
 
 
         elif self.mode == "segmentation":
@@ -566,7 +566,7 @@ class Model(abc.ABC):
                     T = solve_T(inp_case, score_flatten) # return T of shape ``(n, )``
                     probability_case = np.zeros((score_flatten.shape + (self.num_class,))) # ``(n, d)``
                     for ksample in range(len(score)):
-                        probability_case[ksample, :] = cal_softmax(inp_case, T[ksample]) # ``(n, d)``
+                        probability_case[ksample, :] = cal_softmax(inp_case[ksample, :], T[ksample]) # ``(n, d)``
                     probability_case = probability_case.T # ``(d, n)``
                     probability_case = probability_case.reshape(((self.num_class,) + score_case.shape)) # ``(d, H, W, (D))``
                     probability.append(probability_case)
