@@ -18,6 +18,8 @@ class Solver(abc.ABC):
     Atrributes:
         model (moval.models.Model): 
             The model to calibrate the network outputs.
+        metric (str):
+            The considered performance metric to align.
         class_specific (bool):
             If ``True``, the calculation will match class-wise confidence to class-wise accuracy/DSC.
         criterions (moval.solver.Calibrate):
@@ -26,15 +28,16 @@ class Solver(abc.ABC):
     """
 
     model: moval.models.Model
+    metric: str
     class_specific: bool = dataclasses.field(init=False)
     
     def __post_init__(self):
         self.class_specific = self.model.class_specific
 
         if self.model.mode == "classification":
-            self.criterions = moval.solvers.clsCalibrate(class_specific=self.class_specific)
+            self.criterions = moval.solvers.clsCalibrate(class_specific = self.class_specific, metric = self.metric)
         elif self.model.mode == "segmentation":
-            self.criterions = moval.solvers.segCalibrate(class_specific=self.class_specific)
+            self.criterions = moval.solvers.segCalibrate(class_specific = self.class_specific, metric = self.metric)
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
 
@@ -52,17 +55,42 @@ class Solver(abc.ABC):
         if not self.class_specific:
             self.model.param = x
             if self.model.extend_param:
-                estim_acc, estim_cls = self.model(self.inp, midstage = True, gt_guide = self.gt_guide)
+                estim_acc, _ = self.model(self.inp, midstage = True, gt_guide = self.gt_guide)
             else:
-                estim_acc, estim_cls = self.model(self.inp, gt_guide = self.gt_guide)
+                estim_acc, _ = self.model(self.inp, gt_guide = self.gt_guide)
             err = self.criterions(self.inp, self.gt, estim_acc)
         else:
             self.model.param[self.kcls] = x
-            if self.model.extend_param:
-                estim_acc, estim_cls = self.model(self.inp, midstage = True, gt_guide = self.gt_guide)
+            
+            if self.metric == "accuracy":
+                if self.model.extend_param:
+                    _, estim_perf = self.model.estimate_accuracy(self.inp, midstage = True, gt_guide = self.gt_guide)
+                else:
+                    _, estim_perf = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
+            elif self.metric == "sensitivity":
+                if self.model.extend_param:
+                    _, estim_perf = self.model.estimate_sensitivity(self.inp, midstage = True, gt_guide = self.gt_guide)
+                else:
+                    _, estim_perf = self.model.estimate_sensitivity(self.inp, gt_guide = self.gt_guide)
+            elif self.metric == "precision":
+                if self.model.extend_param:
+                    _, estim_perf = self.model.estimate_precision(self.inp, midstage = True, gt_guide = self.gt_guide)
+                else:
+                    _, estim_perf = self.model.estimate_precision(self.inp, gt_guide = self.gt_guide)
+            elif self.metric == "f1score":
+                if self.model.extend_param:
+                    _, estim_perf = self.model.estimate_f1score(self.inp, midstage = True, gt_guide = self.gt_guide)
+                else:
+                    _, estim_perf = self.model.estimate_f1score(self.inp, gt_guide = self.gt_guide)
+            elif self.metric == "auc":
+                if self.model.extend_param:
+                    _, estim_perf = self.model.estimate_auc(self.inp, midstage = True, gt_guide = self.gt_guide)
+                else:
+                    _, estim_perf = self.model.estimate_auc(self.inp, gt_guide = self.gt_guide)
             else:
-                estim_acc, estim_cls = self.model(self.inp, gt_guide = self.gt_guide)
-            err = self.criterions(self.inp, self.gt, estim_cls)
+                ValueError(f"Unsupported metric '{self.metric}'")
+
+            err = self.criterions(self.inp, self.gt, estim_perf)
             err = np.mean(err)
 
         return err
@@ -83,8 +111,21 @@ class Solver(abc.ABC):
             err = self.criterions(self.inp, self.gt, estim_acc)
         else:
             self.model.param_ext[self.kcls] = x
-            estim_acc, estim_cls = self.model(self.inp, gt_guide = self.gt_guide)
-            err_cls = self.criterions(self.inp, self.gt, estim_cls)
+
+            if self.metric == "accuracy":
+                _, estim_perf = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
+            elif self.metric == "sensitivity":
+                _, estim_perf = self.model.estimate_sensitivity(self.inp, gt_guide = self.gt_guide)
+            elif self.metric == "precision":
+                _, estim_perf = self.model.estimate_precision(self.inp, gt_guide = self.gt_guide)
+            elif self.metric == "f1score":
+                _, estim_perf = self.model.estimate_f1score(self.inp, gt_guide = self.gt_guide)
+            elif self.metric == "auc":
+                _, estim_perf = self.model.estimate_auc(self.inp, gt_guide = self.gt_guide)
+            else:
+                ValueError(f"Unsupported metric '{self.metric}'")
+
+            err_cls = self.criterions(self.inp, self.gt, estim_perf)
             err = err_cls[self.kcls]
 
         return err
@@ -106,7 +147,7 @@ class Solver(abc.ABC):
 
         """
 
-        print(f"Starting optimizing for model {self.model.estim_algorithm} with confidence {self.model.confidence_scores}, class specific is {self.model.class_specific}.")
+        print(f"Starting optimizing for model {self.model.estim_algorithm} with confidence {self.model.confidence_scores} based on metric {self.metric}, class specific is {self.model.class_specific}.")
 
         if self.model.estim_algorithm == "ac-model":
             # do not need optimization, end task as soon as we possible!
@@ -138,7 +179,8 @@ class Solver(abc.ABC):
             self.gt_guide = None
 
         self.model.train()
-
+        
+        # some hyper parameters.
         optimization_method = 'Nelder-Mead'
         x0 = np.array([1.0])
         search_threshold = 0.01 # if the optimized results are larger than this, we go through the initial conditions
@@ -147,13 +189,15 @@ class Solver(abc.ABC):
             initial_conditions = [np.array([0.001]), np.array([0.1]), np.array([0.2]), np.array([0.3]), np.array([0.4]),
                                   np.array([0.5]), np.array([0.6]), np.array([0.7]), np.array([0.8]), np.array([0.9])]
             print(f"Opitimizing with {inp.shape[0]} samples...")
+            kcls_start = 0
         else:
             initial_conditions = [np.array([0.001]), np.array([0.5])]
             print(f"Opitimizing with {len(inp)} samples...")
             print("Be patient, it should take a while...")
+            kcls_start = 1 # leave the background class uncalibrated.
 
         if self.class_specific:
-            for kcls in range(self.model.num_class):
+            for kcls in range(kcls_start, self.model.num_class):
                 self.kcls = kcls
                 optimization_result = scipy.optimize.minimize(
                                 fun = self.eval_func,
@@ -226,7 +270,7 @@ class Solver(abc.ABC):
                     self.model.param = np.array([1])
 
             if self.class_specific:
-                for kcls in range(self.model.num_class):
+                for kcls in range(kcls_start, self.model.num_class):
                     self.kcls = kcls
                     optimization_result = scipy.optimize.minimize(
                                     fun = self.eval_func_ext,

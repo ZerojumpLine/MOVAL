@@ -253,6 +253,7 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
     AUCs = []
     TPRall = []
     FPRall = []
+    smooth = 1e-6
     for test_cls in range(x.shape[1]):
         # low thres -> high FPR -> high sensitivity (TPR)
         # obtain TPRs and FPRs
@@ -273,8 +274,8 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
 
             tp, fp, fn = get_tp_fp_fn(x, y, axes, square)
 
-            TPR = tp[test_cls] / np.sum(y == test_cls)
-            FPR = fp[test_cls] / np.sum(y != test_cls)
+            TPR = tp[test_cls] / (np.sum(y == test_cls) + smooth)
+            FPR = fp[test_cls] / (np.sum(y != test_cls) + smooth)
 
             TPRs.append(TPR)
             FPRs.append(FPR)

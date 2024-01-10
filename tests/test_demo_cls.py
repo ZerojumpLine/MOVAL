@@ -8,6 +8,9 @@ import gdown
 import zipfile
 import moval
 
+from moval.solvers.utils import ComputMetric, ComputAUC
+from moval.models.utils import cal_softmax
+
 """Test the func with classification tasks.
 
     Examples:
@@ -46,6 +49,10 @@ logits_test = np.array(cnn_pred_test[['logit_0', 'logit_1', 'logit_2', 'logit_3'
                                       'logit_5', 'logit_6', 'logit_7', 'logit_8', 'logit_9']])
 gt_test = np.argmax(targets_all_test, axis = 1)
 
+# cut some test data for acceleration
+gt_test = gt_test[:5000, ]
+logits_test = logits_test[:5000, :]
+
 # logits is of shape ``(n, d)``
 # gt is of shape ``(n, )``
 
@@ -80,7 +87,28 @@ def test_cls(estim_algorithm, mode, confidence_scores, class_specific):
 
     estim_acc_test = moval_model.estimate(logits_test)
     pred_test = np.argmax(logits_test, axis = 1)
-    err_test = np.abs( np.sum(gt_test == pred_test) / len(gt_test) - estim_acc_test )
+    real_acc = np.sum(gt_test == pred_test) / len(gt_test)
+    
+    estim_sensitivity = moval_model.estimate_sensitivity(logits_test)
+    estim_precision = moval_model.estimate_precision(logits_test)
+    estim_F1score = moval_model.estimate_F1score(logits_test)
+    estim_auc = moval_model.estimate_auc(logits_test)
+
+    real_F1scores = []
+    real_sensitivities = []
+    real_precisions = []
+    for kcls in range(logits_test.shape[1]):
+        real_F1score, real_sensitivity, real_precision = ComputMetric(gt_test == kcls, pred_test == kcls)
+        real_F1scores.append(real_F1score)
+        real_sensitivities.append(real_sensitivity)
+        real_precisions.append(real_precision)
+    
+    real_auc = ComputAUC(gt_test, cal_softmax(logits_test))
+
+    err_sensitivity = np.abs( estim_sensitivity - np.mean(real_sensitivity) )
+    err_precision = np.abs( estim_precision - np.mean(real_precision) )
+    err_F1score = np.abs( estim_F1score - np.mean(real_F1score) )
+    err_auc = np.abs( estim_auc - np.mean(real_auc) )
 
     test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
 
@@ -97,8 +125,40 @@ def test_cls(estim_algorithm, mode, confidence_scores, class_specific):
             f.write("moval extended parameter: ")
             f.write(str(moval_model.model_.param_ext))
             f.write('\n')
-        f.write("test err: ")
-        f.write(str(err_test))
+        f.write("real acc: ")
+        f.write(str(real_acc))
+        f.write('\n')
+        f.write("estimated acc: ")
+        f.write(str(estim_acc_test))
+        
+        f.write('\n')
+        f.write("real sensitivity: ")
+        f.write(str(np.mean(real_sensitivities)))
+        f.write('\n')
+        f.write("estimated sensitivity: ")
+        f.write(str(estim_sensitivity))
+        
+        f.write('\n')
+        f.write("real precision: ")
+        f.write(str(np.mean(real_precisions)))
+        f.write('\n')
+        f.write("estimated precision: ")
+        f.write(str(estim_precision))
+
+        f.write('\n')
+        f.write("real F1score: ")
+        f.write(str(np.mean(real_F1scores)))
+        f.write('\n')
+        f.write("estimated F1score: ")
+        f.write(str(estim_F1score))
+
+        f.write('\n')
+        f.write("real AUC: ")
+        f.write(str(np.mean(real_auc)))
+        f.write('\n')
+        f.write("estimated AUC: ")
+        f.write(str(estim_auc))
+
         f.write('\n')
         f.write('\n')
 

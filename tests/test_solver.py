@@ -35,6 +35,7 @@ def test_solver(estim_algorithm, mode, numclass, confidence_scores, class_specif
             confidence_scores = confidence_scores,
             class_specific = class_specific
             )
+    model.train()
     solver = moval.solvers.init("base-solver", model = model)
     assert isinstance(solver, moval.solvers.Solver)
 
@@ -65,7 +66,7 @@ def test_solver(estim_algorithm, mode, numclass, confidence_scores, class_specif
         inp = []
         gt = []
         for _ in range(5):
-            inp.append(np.random.randn(numclass, 10, 10, 10)) # 5 samples, 3 classes, of volume shape ``(50, 50, 50)``
+            inp.append(np.random.randn(numclass, 10, 10, 10)) # 5 samples, 3 classes, of volume shape ``(10, 10, 10)``
             gt.append(np.random.randint(0, numclass, (10, 10, 10)))
 
         _estim_acc, _estim_dsc = model(inp)

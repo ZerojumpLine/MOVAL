@@ -205,8 +205,8 @@ class Model(abc.ABC):
 
                 return normalized_scores
     
-    def __call__(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
-        """Calculate the performance using network output.
+    def estimate_accuracy(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
+        """Estimate the accuracy using network output.
 
         Args:
             inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
@@ -219,8 +219,6 @@ class Model(abc.ABC):
         Returns:
             estim_acc: A float scalar that represents the estimated accuracy for the given input data.
             estim_cls: Estimated class-wise performance of shape ``(d, )``.
-                For classification task, this is the class-wise estimated accuracy.
-                For segmentation task, this class-wise estimated accuracy for background and DSC estimation for other foreground classes.
 
         """
 
@@ -243,50 +241,25 @@ class Model(abc.ABC):
                 estim_acc_allcls.append(estim_acc_kcls)
             return estim_acc, np.array(estim_acc_allcls)
         elif self.mode == "segmentation":
-            # for segmentation tasks, return average confidence for background class (c=0), and return the soft dsc for other foreground classes.
+            # for segmentation tasks
             scores = []
-            scores_bg = []
             for n_case in range(len(inp)):
-                pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
-                pred_flatten = pred_case.flatten() # ``n``
                 score_flatten = score[n_case].flatten() # ``n``
-                score_flatten_bg = score_flatten[np.where(pred_flatten == 0)[0]]
                 scores.append(score_flatten)
-                scores_bg.append(score_flatten_bg)
-
             estim_acc = np.mean( np.concatenate(scores) )
-            estim_acc_bg = np.mean( np.concatenate(scores_bg) )
-            
-            # Note, the calculation of dice score need the probability of non-maximum classes 
-            # Therefore, here we calculate the probability calculation function
-            estim_dsc_list = []
-            if self.extend_param:
-                probability = self.calculate_probability(inp, midstage)
-            else:
-                probability = self.calculate_probability(inp)
-            for n_case in range(len(inp)):
-                pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
-                score_filled = probability[n_case]
-                #
-                estim_dsc = SoftDiceLoss(score_filled[np.newaxis, ...], pred_case[np.newaxis, ...])
-                #
-                if isinstance(gt_guide, np.ndarray):
-                    gt_case = gt_guide[n_case]
-                    # We remove the class DSC if there isn't any in gt
-                    for kcls in range(len(estim_dsc)):
-                        if gt_case[kcls] is False:
-                            estim_dsc[kcls] = -1
 
-                estim_dsc_list.append(estim_dsc)
+            estim_acc_allcls = []
+            for kcls in range(inp[0].shape[0]):
+                scores_kcls = []
+                for n_case in range(len(inp)):
+                    pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
+                    pred_flatten = pred_case.flatten() # ``n``
+                    score_flatten = score[n_case].flatten() # ``n``
+                    score_flatten_kcls = score_flatten[np.where(pred_flatten == kcls)[0]]
+                    scores_kcls.append(score_flatten_kcls)
+                estim_acc_allcls.append(np.mean( np.concatenate(scores_kcls) ))
             
-            # only aggregate the ones which are not -1
-            estim_dsc_list = np.array(estim_dsc_list) # ``(n, d)``
-            m_estim_dsc = []
-            for kcls in range(len(estim_dsc)):
-                m_estim_dsc.append(estim_dsc_list[:, kcls][estim_dsc_list[:,kcls] >= 0].mean())
-            m_estim_dsc = np.array(m_estim_dsc)
-            
-            return estim_acc, np.concatenate([np.array([estim_acc_bg]), m_estim_dsc[1:]])
+            return estim_acc, np.array(estim_acc_allcls)
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
 
@@ -393,7 +366,7 @@ class Model(abc.ABC):
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
     
-    def estimate_F1score(self, inp: Union[List[Iterable], np.ndarray], probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
+    def estimate_f1score(self, inp: Union[List[Iterable], np.ndarray], probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
         """Esimate the F1score using network output.
 
         Args:
@@ -442,7 +415,7 @@ class Model(abc.ABC):
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
     
-    def estimate_AUC(self, probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
+    def estimate_auc(self, probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
         """Esimate the AUC using network output.
 
         Args:
@@ -463,7 +436,7 @@ class Model(abc.ABC):
         # Estimate the sensitivity.
         if self.mode == "classification":
             # probability is of shape ``(n, d)``
-            estim_AUC = SoftAUC(probability)
+            estim_AUC, _, _ = SoftAUC(probability)
             return estim_AUC
         elif self.mode == "segmentation":
             # probability is a list of n ``(d, H, W, (D))``.
@@ -471,7 +444,7 @@ class Model(abc.ABC):
             for n_case in range(len(probability)):
                 score_filled = probability[n_case] # ``(d, H, W, (D))``
                 #
-                estim_AUC = SoftAUC(score_filled[np.newaxis, ...])
+                estim_AUC, _, _ = SoftAUC(score_filled[np.newaxis, ...])
                 #
                 if isinstance(gt_guide, np.ndarray):
                     gt_case = gt_guide[n_case]
@@ -509,6 +482,7 @@ class Model(abc.ABC):
 
         Note:
             The calibrated probability should have the same dimension with network outputs.
+            The calculation is slow as we need to go through every samples.
 
         Args:
             inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
@@ -536,8 +510,7 @@ class Model(abc.ABC):
 
                 probability = np.zeros((score.shape + (self.num_class,))) # ``(n, d)``
                 for ksample in range(len(score)):
-                    probability[ksample, :] = cal_softmax(inp[ksample, :], T[ksample])
-
+                    probability[ksample, :] = cal_softmax(inp[ksample: ksample + 1], T[ksample]) # ``(1, d)``
 
         elif self.mode == "segmentation":
             # extend from a list of n ``(H, W, (D))`` to a list of n ``(d, H, W, (D))``
@@ -566,7 +539,7 @@ class Model(abc.ABC):
                     T = solve_T(inp_case, score_flatten) # return T of shape ``(n, )``
                     probability_case = np.zeros((score_flatten.shape + (self.num_class,))) # ``(n, d)``
                     for ksample in range(len(score)):
-                        probability_case[ksample, :] = cal_softmax(inp_case[ksample, :], T[ksample]) # ``(n, d)``
+                        probability_case[ksample, :] = cal_softmax(inp_case[ksample: ksample + 1], T[ksample]) # ``(1, d)``
                     probability_case = probability_case.T # ``(d, n)``
                     probability_case = probability_case.reshape(((self.num_class,) + score_case.shape)) # ``(d, H, W, (D))``
                     probability.append(probability_case)
@@ -574,7 +547,73 @@ class Model(abc.ABC):
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
         
-        raise probability
+        return probability
+    
+    def calculate_probability_appr(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> Union[List[Iterable], np.ndarray]:
+        """Calculate the calibrated probability with parameters.
+        To acclerate the optimization process, we calculate the probability but divide 1-score equally to other classes.
+        I should use it for all the segmentation tasks, as the pixel number is always quite large.
+
+        Note:
+            The calibrated probability should have the same dimension with network outputs.
+            This is identical to calculate_probability when d == 2, i.e. binary segmentation, which is the most common case. Therefore, I am not very worry about the descrepencies.
+
+        Args:
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            midstage: If ``True``, return the first calibrated results.
+
+        Returns:
+            calibrated_probability: The calibrated probability which would match the accuracy/DSC on validation data, of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+        
+        """
+
+        if self.extend_param:
+            score = self.calibrate(inp, midstage)
+        else:
+            score = self.calibrate(inp)
+            
+        if self.mode == "classification":
+            # extend from ``(n, )`` to ``(n, d)``
+            pred_flatten = np.argmax(inp, axis = 1)
+            probability = np.zeros((score.shape + (self.num_class,))) # ``(n, d)``
+            if self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
+                # ATC cannot get the calibrated probability of all classes, we just fill the other dimension with zeros
+                pass
+            else:
+                # first fill the probability with score / (d-1)
+                score_extended = np.tile(score, (self.num_class,1)).transpose()
+                probability[np.arange(probability.shape[0]), :] = (1 - score_extended) / (self.num_class - 1) # ``(n, d)``
+            
+            probability[np.arange(probability.shape[0]), pred_flatten] = score # overwrite the confidence score of the predicted class
+
+        elif self.mode == "segmentation":
+            # extend from a list of n ``(H, W, (D))`` to a list of n ``(d, H, W, (D))``
+            
+            probability = []
+            for n_case in range(len(inp)):
+                pred_case = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
+                #
+                pred_flatten = pred_case.flatten() # ``n``
+                score_case = score[n_case] # ``(H, W, (D))``
+                score_flatten = score[n_case].flatten() # ``n``
+                probability_case = np.zeros((score_flatten.shape + (self.num_class,))) # ``(n, d)``
+                if self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
+                    # ATC cannot get the calibrated probability of all classes, we just fill the other dimension with zeros
+                    pass
+                else:
+                    # first fill the probability with score / (d-1)
+                    score_extended = np.tile(score_flatten, (self.num_class,1)).transpose()
+                    probability_case[np.arange(probability_case.shape[0]), :] = (1 - score_extended) / (self.num_class - 1) # ``(n, d)``
+
+                probability_case[np.arange(probability_case.shape[0]), pred_flatten] = score_flatten # ``(n, d)``
+                probability_case = probability_case.T # ``(d, n)``
+                probability_case = probability_case.reshape(((self.num_class,) + score_case.shape)) # ``(d, H, W, (D))``
+                probability.append(probability_case)
+
+        else:
+            raise ValueError(f"Unknown mode '{self.mode}'")
+        
+        return probability
 
 @register("ac-model")
 class acModel(Model):

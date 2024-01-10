@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import nibabel as nib
 import itertools
-from moval.solvers.utils import ComputMetric
+from moval.solvers.utils import ComputMetric, ComputAUC
 
 import os
 import zipfile

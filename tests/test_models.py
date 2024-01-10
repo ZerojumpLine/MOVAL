@@ -17,6 +17,12 @@ def test_registry():
     assert moval.registry.is_registry(moval.models)
     assert moval.registry.is_registry(moval.models, check_docs=True)
 
+# estim_algorithm = "ts-model"
+# mode = "segmentation"
+# numclass = 2
+# confidence_scores = "max_class_probability-conf"
+# class_specific = True
+
 @pytest.mark.parametrize(
         "estim_algorithm, mode, numclass, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
@@ -48,7 +54,7 @@ def test_model(estim_algorithm, mode, numclass, confidence_scores, class_specifi
         # segmentation logit input
         inp = []
         for _ in range(5):
-            inp.append(np.random.randn(numclass, 50, 50, 50)) # 10 samples, 3 classes, of volume shape ``(100, 100, 100)``
+            inp.append(np.random.randn(numclass, 20, 20, 20)) # 10 samples, 2 / 10 classes, of volume shape ``(20, 20, 20)``
         estim_acc, estim_dsc = model(inp)
         assert estim_acc <= 1 and estim_acc >= 0
         assert len(estim_dsc) == numclass
