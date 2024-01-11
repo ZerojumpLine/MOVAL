@@ -256,7 +256,30 @@ class MOVAL(BaseEstimator):
         """
 
         fitted_perf = []
-        if model.mode == "segmentation":
+        
+        if model.mode == "classification":
+
+            if metric == "accuracy":
+                for n_case in range(len(probability)):
+                    estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], probability[n_case:n_case + 1])
+                    fitted_perf.append(estim_perf_case)
+            elif metric == "sensitivity":
+                estim_perf_case = model.estimate_sensitivity(inp, probability)
+                fitted_perf.append(np.mean(estim_perf_case))
+            elif metric == "precision":
+                estim_perf_case = model.estimate_precision(probability)
+                fitted_perf.append(np.mean(estim_perf_case))
+            elif metric == "f1score":
+                estim_perf_case = model.estimate_f1score(inp, probability)
+                fitted_perf.append(np.mean(estim_perf_case))
+            elif metric == "auc":
+                estim_perf_case = model.estimate_auc(probability)
+                fitted_perf.append(np.mean(estim_perf_case))
+            else:
+                ValueError(f"Unsupported metric '{metric}'")      
+        
+        else:
+
             # generate gt_guide from gt here.
             gt_guide = []
             for n_case in range(len(gt)):
@@ -266,30 +289,26 @@ class MOVAL(BaseEstimator):
                     gt_exist.append(np.sum(gt_case == k_cls) > 0)
                 gt_guide.append(gt_exist)
             gt_guide = np.array(gt_guide)
-        else:
-            gt_guide = None
 
-        for n_case in range(len(probability)):
-            
-            if metric == "accuracy":
-                estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
-            elif metric == "sensitivity":
-                estim_perf_case = model.estimate_sensitivity(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
-            elif metric == "precision":
-                estim_perf_case = model.estimate_precision(probability[n_case:n_case + 1], gt_guide = gt_guide)
-            elif metric == "f1score":
-                estim_perf_case = model.estimate_f1score(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
-            elif metric == "auc":
-                estim_perf_case = model.estimate_auc(probability[n_case:n_case + 1], gt_guide = gt_guide)
-            else:
-                ValueError(f"Unsupported metric '{metric}'")
-            
-            if metric == "accuracy":
-                fitted_perf.append(estim_perf_case)
-            elif model.mode == "classification":
-                fitted_perf.append(np.mean(estim_perf_case))
-            else:
-                fitted_perf.append(np.mean(estim_perf_case[1:]))
+            for n_case in range(len(probability)):
+                
+                if metric == "accuracy":
+                    estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+                elif metric == "sensitivity":
+                    estim_perf_case = model.estimate_sensitivity(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+                elif metric == "precision":
+                    estim_perf_case = model.estimate_precision(probability[n_case:n_case + 1], gt_guide = gt_guide)
+                elif metric == "f1score":
+                    estim_perf_case = model.estimate_f1score(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+                elif metric == "auc":
+                    estim_perf_case = model.estimate_auc(probability[n_case:n_case + 1], gt_guide = gt_guide)
+                else:
+                    ValueError(f"Unsupported metric '{metric}'")
+                
+                if metric == "accuracy":
+                    fitted_perf.append(estim_perf_case)
+                else:
+                    fitted_perf.append(np.mean(estim_perf_case[1:]))
         
         return fitted_perf
 
@@ -416,13 +435,13 @@ class MOVAL(BaseEstimator):
         if self.ensemble:
             probabilities = []
             for model in self.model_:
-                probability_cond = model.calculate_probability(logits)
+                probability_cond = model.calculate_probability(logits, appr = True)
 
                 probabilities.append(probability_cond)
                 probability = self.probability_aggregation(probabilities)
         else:
             model = self.model_
-            probability = model.calculate_probability(logits)
+            probability = model.calculate_probability(logits, appr = True)
 
             return probability
 

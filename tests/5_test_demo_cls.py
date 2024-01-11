@@ -63,7 +63,7 @@ if os.path.isfile(results_files):
 
 # estim_algorithm = "ac-model"
 # mode = "classification"
-# metric = "accuracy"
+# metric = "auc"
 # numclass = 10
 # confidence_scores = "max_class_probability-conf"
 # class_specific = True
@@ -84,7 +84,6 @@ def test_cls(estim_algorithm, mode, metric, confidence_scores, class_specific):
                 estim_algorithm = estim_algorithm,
                 class_specific = class_specific
                 )
-
     #
     moval_model.fit(logits, gt)
     estim_metric_val = moval_model.estimate(logits)

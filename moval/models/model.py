@@ -285,7 +285,7 @@ class Model(abc.ABC):
         # Estimate the sensitivity.
         if self.mode == "classification":
             # probability is of shape ``(n, d)``
-            estim_sensitivity = SoftSensitivity(probability, np.argmax(probability, axis = 1))
+            estim_sensitivity = SoftSensitivity(probability, np.argmax(inp, axis = 1))
             return estim_sensitivity
         elif self.mode == "segmentation":
             # probability is a list of n ``(d, H, W, (D))``.
@@ -385,7 +385,7 @@ class Model(abc.ABC):
         # Estimate the sensitivity.
         if self.mode == "classification":
             # probability is of shape ``(n, d)``
-            estim_F1score = SoftDiceLoss(probability, np.argmax(probability, axis = 1))
+            estim_F1score = SoftDiceLoss(probability, np.argmax(inp, axis = 1))
             return estim_F1score
         elif self.mode == "segmentation":
             # probability is a list of n ``(d, H, W, (D))``.
