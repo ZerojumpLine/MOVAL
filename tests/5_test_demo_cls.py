@@ -14,7 +14,7 @@ from moval.models.utils import cal_softmax
 """Test the func with classification tasks.
 
     Examples:
-        >>> pytest tests/test_demo_cls.py
+        >>> pytest tests/5_test_demo_cls.py
 
 """
 
@@ -62,16 +62,19 @@ if os.path.isfile(results_files):
     os.remove(results_files)
 
 @pytest.mark.parametrize(
-        "estim_algorithm, mode, confidence_scores, class_specific", 
+        "estim_algorithm, mode, metric, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
                                ["classification"],
+                            #    ["accuracy", "sensitivity", "precision", "f1score", "auc"],
+                               ["accuracy"],
                                moval.models.get_conf_options(),
                                [False, True])),
 )
-def test_cls(estim_algorithm, mode, confidence_scores, class_specific):
+def test_cls(estim_algorithm, mode, metric, confidence_scores, class_specific):
 
     moval_model = moval.MOVAL(
                 mode = mode,
+                metric = metric,
                 confidence_scores = confidence_scores,
                 estim_algorithm = estim_algorithm,
                 class_specific = class_specific
@@ -79,38 +82,66 @@ def test_cls(estim_algorithm, mode, confidence_scores, class_specific):
 
     #
     moval_model.fit(logits, gt)
-    estim_acc = moval_model.estimate(logits)
+    estim_metric_val = moval_model.estimate(logits)
     pred = np.argmax(logits, axis = 1)
-    err_val = np.abs( np.sum(gt == pred) / len(gt) - estim_acc )
+
+    if metric == "accuracy":
+        real_metric_val = np.sum(gt == pred) / len(gt)
+    elif metric == "sensitivity":
+        real_sensitivities = []
+        for kcls in range(logits.shape[1]):
+            _, real_sensitivity, _ = ComputMetric(gt == kcls, pred == kcls)
+            real_sensitivities.append(real_sensitivity)
+        real_metric_val = np.mean(real_sensitivities)
+    elif metric == "precision":
+        real_precisions = []
+        for kcls in range(logits.shape[1]):
+            _, _, real_precision = ComputMetric(gt == kcls, pred == kcls)
+            real_precisions.append(real_precision)
+        real_metric_val = np.mean(real_precisions)
+    elif metric == "f1score":
+        real_F1scores = []
+        for kcls in range(logits.shape[1]):
+            real_F1score, _, _ = ComputMetric(gt == kcls, pred == kcls)
+            real_F1scores.append(real_F1score)
+        real_metric_val = np.mean(real_F1scores)
+    else:
+        real_auc = ComputAUC(gt, cal_softmax(logits))
+        real_metric_val = np.mean(real_auc)
+
+    err_val = np.abs( real_metric_val - np.mean(estim_metric_val) )
 
     # save the test err in the result files.
 
-    estim_acc_test = moval_model.estimate(logits_test)
     pred_test = np.argmax(logits_test, axis = 1)
-    real_acc = np.sum(gt_test == pred_test) / len(gt_test)
     
-    estim_sensitivity = moval_model.estimate_sensitivity(logits_test)
-    estim_precision = moval_model.estimate_precision(logits_test)
-    estim_F1score = moval_model.estimate_F1score(logits_test)
-    estim_auc = moval_model.estimate_auc(logits_test)
+    estim_metric = moval_model.estimate(logits_test)
 
-    real_F1scores = []
-    real_sensitivities = []
-    real_precisions = []
-    for kcls in range(logits_test.shape[1]):
-        real_F1score, real_sensitivity, real_precision = ComputMetric(gt_test == kcls, pred_test == kcls)
-        real_F1scores.append(real_F1score)
-        real_sensitivities.append(real_sensitivity)
-        real_precisions.append(real_precision)
-    
-    real_auc = ComputAUC(gt_test, cal_softmax(logits_test))
+    if metric == "accuracy":
+        real_metric = np.sum(gt_test == pred_test) / len(gt_test)
+    elif metric == "sensitivity":
+        real_sensitivities = []
+        for kcls in range(logits.shape[1]):
+            _, real_sensitivity, _ = ComputMetric(gt_test == kcls, pred_test == kcls)
+            real_sensitivities.append(real_sensitivity)
+        real_metric = np.mean(real_sensitivities)
+    elif metric == "precision":
+        real_precisions = []
+        for kcls in range(logits.shape[1]):
+            _, _, real_precision = ComputMetric(gt_test == kcls, pred_test == kcls)
+            real_precisions.append(real_precision)
+        real_metric = np.mean(real_precisions)
+    elif metric == "f1score":
+        real_F1scores = []
+        for kcls in range(logits.shape[1]):
+            real_F1score, _, _ = ComputMetric(gt_test == kcls, pred_test == kcls)
+            real_F1scores.append(real_F1score)
+        real_metric = np.mean(real_F1scores)
+    else:
+        real_auc = ComputAUC(gt_test, cal_softmax(logits_test))
+        real_metric = np.mean(real_auc)
 
-    err_sensitivity = np.abs( estim_sensitivity - np.mean(real_sensitivity) )
-    err_precision = np.abs( estim_precision - np.mean(real_precision) )
-    err_F1score = np.abs( estim_F1score - np.mean(real_F1score) )
-    err_auc = np.abs( estim_auc - np.mean(real_auc) )
-
-    test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
+    test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, metric = {metric}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
 
     with open(results_files, 'a') as f:
         f.write(test_condition)
@@ -125,40 +156,11 @@ def test_cls(estim_algorithm, mode, confidence_scores, class_specific):
             f.write("moval extended parameter: ")
             f.write(str(moval_model.model_.param_ext))
             f.write('\n')
-        f.write("real acc: ")
-        f.write(str(real_acc))
+        f.write("real metric: ")
+        f.write(str(real_metric))
         f.write('\n')
-        f.write("estimated acc: ")
-        f.write(str(estim_acc_test))
-        
-        f.write('\n')
-        f.write("real sensitivity: ")
-        f.write(str(np.mean(real_sensitivities)))
-        f.write('\n')
-        f.write("estimated sensitivity: ")
-        f.write(str(estim_sensitivity))
-        
-        f.write('\n')
-        f.write("real precision: ")
-        f.write(str(np.mean(real_precisions)))
-        f.write('\n')
-        f.write("estimated precision: ")
-        f.write(str(estim_precision))
-
-        f.write('\n')
-        f.write("real F1score: ")
-        f.write(str(np.mean(real_F1scores)))
-        f.write('\n')
-        f.write("estimated F1score: ")
-        f.write(str(estim_F1score))
-
-        f.write('\n')
-        f.write("real AUC: ")
-        f.write(str(np.mean(real_auc)))
-        f.write('\n')
-        f.write("estimated AUC: ")
-        f.write(str(estim_auc))
-
+        f.write("estimated metric: ")
+        f.write(str(np.mean(estim_metric)))
         f.write('\n')
         f.write('\n')
 

@@ -181,7 +181,8 @@ class segCalibrate(Calibrate):
             
             if self.metric == "accuracy":
                 
-                for kcls in range(0, inp[n_case].shape[0]):
+                err = np.zeros(inp[0].shape[0])
+                for kcls in range(0, inp[0].shape[0]):
                     
                     pred_all_flatten_kcls = []
                     gt_all_flatten_kcls = []
@@ -194,6 +195,9 @@ class segCalibrate(Calibrate):
                         pred_all_flatten_kcls.append(pred_case.flatten()[pos_kcls])
                         gt_all_flatten_kcls.append(gt_case.flatten()[pos_kcls])
                     
+                    pred_all_flatten_kcls = np.concatenate(pred_all_flatten_kcls, axis=0)
+                    gt_all_flatten_kcls = np.concatenate(gt_all_flatten_kcls, axis=0)
+
                     acc_cls = np.sum(gt_all_flatten_kcls == pred_all_flatten_kcls) / len(gt_all_flatten_kcls)
                     err[kcls] = estim[kcls] - acc_cls
                 
@@ -289,7 +293,7 @@ class segCalibrate(Calibrate):
                     flatten_dim = np.prod(rest_of_dimensions)
                     inp_case = inp_case.reshape((d, flatten_dim))
                     inp_case = inp_case.T # ``(n, d)``
-                    probability = cal_softmax(cal_softmax) # ``(n, d)``                    
+                    probability = cal_softmax(inp_case) # ``(n, d)``                    
                     gt_case     = gt[n_case].flatten() # ``(n, )``
 
                     auc_case = ComputAUC(gt_case, probability) # ``(d, )``

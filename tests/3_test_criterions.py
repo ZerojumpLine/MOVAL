@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import itertools
 
 import moval
 import moval.solvers
@@ -7,13 +8,17 @@ import moval.solvers
 """Test the confidence calculation functions.
 
     Examples:
-        >>> pytest tests/test_criterions.py
+        >>> pytest tests/3_test_criterions.py
 
 """
 
-@pytest.mark.parametrize("class_specific", [False, True])
-def test_cls_criterions(class_specific):
-    criterions = moval.solvers.clsCalibrate(class_specific=class_specific)
+@pytest.mark.parametrize(
+        "metric, class_specific", 
+        list(itertools.product(["accuracy", "sensitivity", "precision", "f1score", "auc"],
+        [False, True])),
+        )
+def test_cls_criterions(metric, class_specific):
+    criterions = moval.solvers.clsCalibrate(class_specific=class_specific, metric=metric)
     assert isinstance(criterions, moval.solvers.Calibrate)
 
     # classification logit input
@@ -31,9 +36,13 @@ def test_cls_criterions(class_specific):
     assert np.mean(err) < 1
     assert np.mean(err) > 0
 
-@pytest.mark.parametrize("class_specific", [False, True])
-def test_seg_criterions(class_specific):
-    criterions = moval.solvers.segCalibrate(class_specific=class_specific)
+@pytest.mark.parametrize(
+        "metric, class_specific", 
+        list(itertools.product(["accuracy", "sensitivity", "precision", "f1score", "auc"],
+        [False, True])),
+        )
+def test_seg_criterions(metric, class_specific):
+    criterions = moval.solvers.segCalibrate(class_specific=class_specific, metric=metric)
     assert isinstance(criterions, moval.solvers.Calibrate)
 
     # segmentation logit input

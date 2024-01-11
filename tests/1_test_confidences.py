@@ -7,7 +7,7 @@ import moval.models
 """Test the confidence calculation functions.
 
     Examples:
-        >>> pytest tests/test_confidences.py
+        >>> pytest tests/1_test_confidences.py
 
 """
 

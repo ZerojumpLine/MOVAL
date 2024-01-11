@@ -12,7 +12,7 @@ import moval
 """Test the func with 2d segmentation tasks with multiple classes.
 
     Examples:
-        >>> pytest tests/test_demo_seg_2d_multicls.py
+        >>> pytest tests/7_test_demo_seg_2d_multicls.py
 
 """
 

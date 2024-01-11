@@ -474,8 +474,29 @@ class Model(abc.ABC):
         
         raise NotImplementedError()
     
-    def calculate_probability(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> Union[List[Iterable], np.ndarray]:
+    def calculate_probability(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, appr: bool = False) -> Union[List[Iterable], np.ndarray]:
         """Calculate the calibrated probability with parameters.
+        For classificaiton tasks, we choose to estimate the pseudo-temperature, for segmentation tasks, we simplify it with 1-socre.
+
+        Args:
+            inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+            midstage: If ``True``, return the first calibrated results.
+            appr: If ``True``, utilize the approximation version.
+
+        Returns:
+            calibrated_probability: The calibrated probability which would match the accuracy/DSC on validation data, of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
+        
+        """
+
+        if self.mode == "segmentation" or appr:
+            return self.calculate_probability_appr(inp, midstage)
+        elif self.mode == "classification":
+            return self.calculate_probability_temperature(inp, midstage)
+        else:
+            raise ValueError(f"Unknown mode '{self.mode}'")
+
+    def calculate_probability_temperature(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> Union[List[Iterable], np.ndarray]:
+        """Calculate the calibrated probability with parameters, based on temperature scaling.
         The challenge is the calculation of non-maximum probability. 
         To achieve this, we calculate the pseudo-temperature for each samples such that the confidence score match the max probability after the temperature scaling process.
         Then, we utilize the pseudo-temperature to scale the probabilities of other classes.
@@ -550,7 +571,7 @@ class Model(abc.ABC):
         return probability
     
     def calculate_probability_appr(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> Union[List[Iterable], np.ndarray]:
-        """Calculate the calibrated probability with parameters.
+        """Calculate the calibrated probability with parameters, utilizing approximation of 1-score.
         To acclerate the optimization process, we calculate the probability but divide 1-score equally to other classes.
         I should use it for all the segmentation tasks, as the pixel number is always quite large.
 

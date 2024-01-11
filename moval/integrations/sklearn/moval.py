@@ -163,10 +163,7 @@ class MOVAL(BaseEstimator):
                 )
                 solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
                 solver.fit(logits, gt) # model fitting
-                if model.extend_param:
-                    probability_cond = model.calculate_probability(logits, False)
-                else:
-                    probability_cond = model.calculate_probability(logits) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
+                probability_cond = model.calculate_probability(logits) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
                 #
                 models.append(model)
                 solvers.append(solver)
@@ -360,7 +357,7 @@ class MOVAL(BaseEstimator):
         
         return logits_post, gt_post
 
-    def estimate_accuracy(self,
+    def estimate(self,
                  logits: Union[List[Iterable], np.ndarray],
                  gt_guide: np.ndarray = None):
         """The function to estimate the model performance. This will call other corresponding metric calculation functions.
@@ -371,7 +368,8 @@ class MOVAL(BaseEstimator):
                 If ``False``, it means that there isn't any manuel label of class d in this sample.
         
         Returns:
-            estim: estimated accuracy (float).
+            estim: estimated metric (float) for classification tasks, 
+                or class-wise estimated metric of shape ``(d-1, )`` for segmentation tasks.
 
         Example:
 
@@ -398,6 +396,41 @@ class MOVAL(BaseEstimator):
         else:
             ValueError(f"Unsupported metric '{self.metric}'")
 
+    def get_probability(self,
+                        logits: Union[List[Iterable], np.ndarray]):
+        """Obtain the the probability give the logits.
+
+        Note:
+            It will ensemble (not exactly ensemble, but calculate the mean of probability) moval-ensemble.
+            Here we utilize ``calculate_probability`` for classification, while ``calculate_probability_appr`` for segmentation. 
+            Because the sample number of segmentation tasks is too large.
+
+        Args:
+            logits: A numpy array of size ``(n, d)`` for classification or a list of n ``(d, H, W, (D))`` for segmentation.
+        
+        Examples:
+
+            >>> import moval
+            >>> import numpy as np
+            >>> logits = np.random.randn(1000, 10)
+            >>> moval_model = moval.MOVAL()
+            >>> probability = moval_model.get_probability(logits)
+        
+        """
+            
+        if self.ensemble:
+            probabilities = []
+            for model in self.model_:
+                probability_cond = model.calculate_probability(logits)
+
+                probabilities.append(probability_cond)
+                probability = self.probability_aggregation(probabilities)
+        else:
+            model = self.model_
+            probability = model.calculate_probability(logits)
+
+            return probability
+
     def estimate_accuracy(self,
                  logits: Union[List[Iterable], np.ndarray],
                  gt_guide: np.ndarray = None):
@@ -410,7 +443,7 @@ class MOVAL(BaseEstimator):
         
         Returns:
             estim: estimated accuracy (float) for classification tasks, 
-                or class-wsie estimated accuracy of shape ``(d-1, )`` for segmentation tasks.
+                or class-wise estimated accuracy of shape ``(d-1, )`` for segmentation tasks.
 
         Example:
 
@@ -440,27 +473,12 @@ class MOVAL(BaseEstimator):
 
         if self.ensemble:
             
-            if model.mode == "classification":
-                probabilities = []
-                for model in self.model_:
-                    if model.extend_param:
-                        probability_cond = model.calculate_probability(logits, False)
-                    else:
-                        probability_cond = model.calculate_probability(logits)
-                    probabilities.append(probability_cond)
-                    probability = self.probability_aggregation(probabilities)
+            probability = self.get_probability(logits)
+
+            if self.mode == "classification":
                 estim_acc = np.mean(np.max(probability, axis = 1))
                 return estim_acc
             else:
-                probabilities = []
-                for model in self.model_:
-                    if model.extend_param:
-                        probability_cond = model.calculate_probability_appr(logits, False)
-                    else:
-                        probability_cond = model.calculate_probability_appr(logits)
-                    probabilities.append(probability_cond)
-                    probability = self.probability_aggregation(probabilities) # a list of n ``(d, H, W, (D))``
-                
                 estim_acc_allcls = []
                 for kcls in range(probability[0].shape[0]):
                     scores_kcls = []
@@ -477,7 +495,7 @@ class MOVAL(BaseEstimator):
         else:
             model = self.model_
 
-            if model.mode == "classification":
+            if self.mode == "classification":
                 estim_acc, _ = model.estimate_accuracy(logits)
                 return estim_acc
             else:
@@ -524,29 +542,15 @@ class MOVAL(BaseEstimator):
                         f"(dimension of training samples, {len(self.n_dim_)}, while dimension of test samples, {len(logits[0].shape)})"
                     )
 
-
+        probability = self.get_probability(logits)
         if self.ensemble:
-            probabilities = []
-            for model in self.model_:
-                if model.extend_param:
-                    probability_cond = model.calculate_probability(logits, False)
-                else:
-                    probability_cond = model.calculate_probability(logits)
-
-                probabilities.append(probability_cond)
-                probability = self.probability_aggregation(probabilities)
+            estim_sensitivity = self.model_[0].estimate_sensitivity(logits, probability, gt_guide = gt_guide)
         else:
-            model = self.model_
-            if model.extend_param:
-                probability = model.calculate_probability(logits, False)
-            else:
-                probability = model.calculate_probability(logits)
+            estim_sensitivity = self.model_.estimate_sensitivity(logits, probability, gt_guide = gt_guide)
 
-        if model.mode == "classification":
-            estim_sensitivity = model.estimate_sensitivity(logits, probability)
+        if self.mode == "classification":
             return np.mean(estim_sensitivity)
         else:
-            estim_sensitivity = model.estimate_sensitivity(logits, probability, gt_guide = gt_guide)
             return estim_sensitivity[1:]
     
     def estimate_precision(self,
@@ -589,47 +593,15 @@ class MOVAL(BaseEstimator):
                         f"(dimension of training samples, {len(self.n_dim_)}, while dimension of test samples, {len(logits[0].shape)})"
                     )
 
+        probability = self.get_probability(logits)
+        if self.ensemble:
+            estim_precision = self.model_[0].estimate_precision(probability, gt_guide = gt_guide)
+        else:
+            estim_precision = self.model_.estimate_precision(probability, gt_guide = gt_guide)
+
         if self.mode == "classification":
-            
-            if self.ensemble:
-                probabilities = []
-                for model in self.model_:
-                    if model.extend_param:
-                        probability_cond = model.calculate_probability(logits, False)
-                    else:
-                        probability_cond = model.calculate_probability(logits)
-
-                    probabilities.append(probability_cond)
-                    probability = self.probability_aggregation(probabilities)
-            else:
-                model = self.model_
-                if model.extend_param:
-                    probability = model.calculate_probability(logits, False)
-                else:
-                    probability = model.calculate_probability(logits)
-
-            estim_precision = model.estimate_precision(probability)
             return np.mean(estim_precision)
         else:
-
-            if self.ensemble:
-                probabilities = []
-                for model in self.model_:
-                    if model.extend_param:
-                        probability_cond = model.calculate_probability_appr(logits, False)
-                    else:
-                        probability_cond = model.calculate_probability_appr(logits)
-
-                    probabilities.append(probability_cond)
-                    probability = self.probability_aggregation(probabilities)
-            else:
-                model = self.model_
-                if model.extend_param:
-                    probability = model.calculate_probability_appr(logits, False)
-                else:
-                    probability = model.calculate_probability_appr(logits)
-
-            estim_precision = model.estimate_precision(logits, probability, gt_guide = gt_guide)
             return estim_precision[1:]
     
     def estimate_f1score(self,
@@ -672,48 +644,16 @@ class MOVAL(BaseEstimator):
                         f"(dimension of training samples, {len(self.n_dim_)}, while dimension of test samples, {len(logits[0].shape)})"
                     )
 
-        if self.mode == "classification":
-
-            if self.ensemble:
-                probabilities = []
-                for model in self.model_:
-                    if model.extend_param:
-                        probability_cond = model.calculate_probability(logits, False)
-                    else:
-                        probability_cond = model.calculate_probability(logits)
-
-                    probabilities.append(probability_cond)
-                    probability = self.probability_aggregation(probabilities)
-            else:
-                model = self.model_
-                if model.extend_param:
-                    probability = model.calculate_probability(logits, False)
-                else:
-                    probability = model.calculate_probability(logits)
-
-            estim_F1score = model.estimate_f1score(logits, probability)
-            return np.mean(estim_F1score)
+        probability = self.get_probability(logits)
+        if self.ensemble:
+            estim_f1score = self.model_[0].estimate_f1score(logits, probability, gt_guide = gt_guide)
         else:
+            estim_f1score = self.model_.estimate_f1score(logits, probability, gt_guide = gt_guide)
 
-            if self.ensemble:
-                probabilities = []
-                for model in self.model_:
-                    if model.extend_param:
-                        probability_cond = model.calculate_probability_appr(logits, False)
-                    else:
-                        probability_cond = model.calculate_probability_appr(logits)
-
-                    probabilities.append(probability_cond)
-                    probability = self.probability_aggregation(probabilities)
-            else:
-                model = self.model_
-                if model.extend_param:
-                    probability = model.calculate_probability_appr(logits, False)
-                else:
-                    probability = model.calculate_probability_appr(logits)   
-
-            estim_F1score = model.estimate_f1score(logits, probability, gt_guide = gt_guide)
-            return estim_F1score[1:]
+        if self.mode == "classification":
+            return np.mean(estim_f1score)
+        else:
+            return estim_f1score[1:]
 
     def estimate_auc(self,
                  logits: Union[List[Iterable], np.ndarray],
@@ -755,49 +695,16 @@ class MOVAL(BaseEstimator):
                         f"(dimension of training samples, {len(self.n_dim_)}, while dimension of test samples, {len(logits[0].shape)})"
                     )
 
+        probability = self.get_probability(logits)
+        if self.ensemble:
+            estim_auc = self.model_[0].estimate_auc(probability, gt_guide = gt_guide)
+        else:
+            estim_auc = self.model_.estimate_auc(probability, gt_guide = gt_guide)
 
         if self.mode == "classification":
-
-            if self.ensemble:
-                probabilities = []
-                for model in self.model_:
-                    if model.extend_param:
-                        probability_cond = model.calculate_probability(logits, False)
-                    else:
-                        probability_cond = model.calculate_probability(logits)
-
-                    probabilities.append(probability_cond)
-                    probability = self.probability_aggregation(probabilities)
-            else:
-                model = self.model_
-                if model.extend_param:
-                    probability = model.calculate_probability(logits, False)
-                else:
-                    probability = model.calculate_probability(logits)
-
-            estim_AUC = model.estimate_auc(probability)
-            return np.mean(estim_AUC)
+            return np.mean(estim_auc)
         else:
-
-            if self.ensemble:
-                probabilities = []
-                for model in self.model_:
-                    if model.extend_param:
-                        probability_cond = model.calculate_probability_appr(logits, False)
-                    else:
-                        probability_cond = model.calculate_probability_appr(logits)
-
-                    probabilities.append(probability_cond)
-                    probability = self.probability_aggregation(probabilities)
-            else:
-                model = self.model_
-                if model.extend_param:
-                    probability = model.calculate_probability_appr(logits, False)
-                else:
-                    probability = model.calculate_probability_appr(logits)
-
-            estim_AUC = model.estimate_auc(probability, gt_guide = gt_guide)
-            return estim_AUC[1:]
+            return estim_auc[1:]
     
     def save(self, filename: str):
         """Save current parameters to disk using pickle.

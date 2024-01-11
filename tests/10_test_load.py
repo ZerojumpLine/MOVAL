@@ -6,7 +6,7 @@ import moval
 """Test the save and load functions.
 
     Examples:
-        >>> pytest tests/test_load.py
+        >>> pytest tests/10_test_load.py
 
 """
 

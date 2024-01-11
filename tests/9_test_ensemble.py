@@ -6,7 +6,7 @@ import moval
 """Test the moval ensemble functions.
 
     Examples:
-        >>> pytest tests/test_ensemble.py
+        >>> pytest tests/9_test_ensemble.py
 
 """
 

@@ -2,17 +2,17 @@ import pytest
 import numpy as np
 import nibabel as nib
 import itertools
-from moval.solvers.utils import ComputMetric
+from moval.solvers.utils import ComputMetric, ComputAUC
 
 import os
 import zipfile
 import gdown
 import moval
 
-"""Test the func with 3d segmentation tasks.
+"""Test the func with 2d segmentation tasks.
 
     Examples:
-        >>> pytest tests/test_demo_seg_3d.py
+        >>> pytest tests/6_test_demo_seg_2d.py
 
 """
 
@@ -58,12 +58,15 @@ for Imgname_eval in Imglist_eval_read:
                             GTimg.shape[1] //2 - 30: GTimg.shape[1] //2 + 30,
                             GTimg.shape[2] //2 - 15: GTimg.shape[2] //2 + 15]
     logit_cls = np.stack((logit_cls0, logit_cls1))  # ``(d, H, W, D)``
-    logits.append(logit_cls)
-    gt.append(GTimg)
+    # only including the slices that contains labels
+    for dslice in range(GTimg.shape[2]):
+        if np.sum(GTimg[:, :, dslice]) > 0:
+            logits.append(logit_cls[:, :, :, dslice])
+            gt.append(GTimg[:, :, dslice])
 
-# logits is a list of length ``n``,  each element has ``(d, H, W, D)``. 
-# gt is a list of length ``n``,  each element has ``(H, W, D)``.
-# H, W and D could differ for different cases.
+# logits is a list of length ``n``,  each element has ``(d, H, W)``. 
+# gt is a list of length ``n``,  each element has ``(H, W)``.
+# H and W could differ for different cases.
 
 Datafile_test = "data_moval/Prostateresults/seg-testA.txt"
 Imglist_test = open(Datafile_test)
@@ -88,19 +91,20 @@ for Imgname_test in Imglist_test_read:
 
     logit_cls = np.stack((logit_cls0, logit_cls1))  # ``(n, H, W, D)``
     
-    logits_test.append(logit_cls)
-    gt_test.append(GTimg)
+    # only including the slices that contains labels
+    for dslice in range(GTimg.shape[2]):
+        if np.sum(GTimg[:, :, dslice]) > 0:
+            logits_test.append(logit_cls[:, :, :, dslice])
+            gt_test.append(GTimg[:, :, dslice])
 
+# logits_test is a list of length ``n``,  each element has ``(d, H, W)``. 
+# gt_test is a list of length ``n``,  each element has ``(H, W)``.
+# H and W could differ for different cases.
 
-# logits_test is a list of length ``n``,  each element has ``(d, H, W, D)``. 
-# gt_test is a list of length ``n``,  each element has ``(H, W, D)``.
-# H, W and D could differ for different cases.
-
-results_files = "results_demo_seg_3d.txt"
+results_files = "results_demo_seg_2d.txt"
 # clean previous results
 if os.path.isfile(results_files):
     os.remove(results_files)
-
 
 # estim_algorithm = "ts-model"
 # mode = "segmentation"

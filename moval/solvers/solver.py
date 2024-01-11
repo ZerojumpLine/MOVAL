@@ -55,9 +55,9 @@ class Solver(abc.ABC):
         if not self.class_specific:
             self.model.param = x
             if self.model.extend_param:
-                estim_acc, _ = self.model(self.inp, midstage = True, gt_guide = self.gt_guide)
+                estim_acc, _ = self.model.estimate_accuracy(self.inp, midstage = True, gt_guide = self.gt_guide)
             else:
-                estim_acc, _ = self.model(self.inp, gt_guide = self.gt_guide)
+                estim_acc, _ = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
             err = self.criterions(self.inp, self.gt, estim_acc)
         else:
             self.model.param[self.kcls] = x
@@ -68,25 +68,17 @@ class Solver(abc.ABC):
                 else:
                     _, estim_perf = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
             elif self.metric == "sensitivity":
-                if self.model.extend_param:
-                    _, estim_perf = self.model.estimate_sensitivity(self.inp, midstage = True, gt_guide = self.gt_guide)
-                else:
-                    _, estim_perf = self.model.estimate_sensitivity(self.inp, gt_guide = self.gt_guide)
+                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
+                estim_perf = self.model.estimate_sensitivity(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "precision":
-                if self.model.extend_param:
-                    _, estim_perf = self.model.estimate_precision(self.inp, midstage = True, gt_guide = self.gt_guide)
-                else:
-                    _, estim_perf = self.model.estimate_precision(self.inp, gt_guide = self.gt_guide)
+                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
+                estim_perf = self.model.estimate_precision(probability, gt_guide = self.gt_guide)
             elif self.metric == "f1score":
-                if self.model.extend_param:
-                    _, estim_perf = self.model.estimate_f1score(self.inp, midstage = True, gt_guide = self.gt_guide)
-                else:
-                    _, estim_perf = self.model.estimate_f1score(self.inp, gt_guide = self.gt_guide)
+                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
+                estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "auc":
-                if self.model.extend_param:
-                    _, estim_perf = self.model.estimate_auc(self.inp, midstage = True, gt_guide = self.gt_guide)
-                else:
-                    _, estim_perf = self.model.estimate_auc(self.inp, gt_guide = self.gt_guide)
+                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
+                estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide)
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")
 
@@ -107,7 +99,7 @@ class Solver(abc.ABC):
         """
         if not self.class_specific:
             self.model.param_ext = x
-            estim_acc, estim_cls = self.model(self.inp, gt_guide = self.gt_guide)
+            estim_acc, _ = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
             err = self.criterions(self.inp, self.gt, estim_acc)
         else:
             self.model.param_ext[self.kcls] = x
@@ -115,13 +107,17 @@ class Solver(abc.ABC):
             if self.metric == "accuracy":
                 _, estim_perf = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
             elif self.metric == "sensitivity":
-                _, estim_perf = self.model.estimate_sensitivity(self.inp, gt_guide = self.gt_guide)
+                probability = self.model.calculate_probability(self.inp, appr=True)
+                estim_perf = self.model.estimate_sensitivity(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "precision":
-                _, estim_perf = self.model.estimate_precision(self.inp, gt_guide = self.gt_guide)
+                probability = self.model.calculate_probability(self.inp, appr=True)
+                estim_perf = self.model.estimate_precision(probability, gt_guide = self.gt_guide)
             elif self.metric == "f1score":
-                _, estim_perf = self.model.estimate_f1score(self.inp, gt_guide = self.gt_guide)
+                probability = self.model.calculate_probability(self.inp, appr=True)
+                estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "auc":
-                _, estim_perf = self.model.estimate_auc(self.inp, gt_guide = self.gt_guide)
+                probability = self.model.calculate_probability(self.inp, appr=True)
+                estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide)
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")
 
@@ -155,7 +151,7 @@ class Solver(abc.ABC):
             self.model.train()
 
             if self.model.conf.normalization:
-                _, _ = self.model(inp)
+                _, _ = self.model.estimate_accuracy(inp)
 
             self.model.eval()
             self.model.is_fitted = True
