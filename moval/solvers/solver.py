@@ -190,7 +190,10 @@ class Solver(abc.ABC):
             initial_conditions = [np.array([0.001]), np.array([0.5])]
             print(f"Opitimizing with {len(inp)} samples...")
             print("Be patient, it should take a while...")
-            kcls_start = 1 # leave the background class uncalibrated.
+            if self.metric == "accuracy":
+                kcls_start = 0
+            else:
+                kcls_start = 1 # leave the background class uncalibrated.
 
         if self.class_specific:
             for kcls in range(kcls_start, self.model.num_class):

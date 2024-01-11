@@ -61,12 +61,17 @@ results_files = "results_demo_cls.txt"
 if os.path.isfile(results_files):
     os.remove(results_files)
 
+# estim_algorithm = "ac-model"
+# mode = "classification"
+# metric = "accuracy"
+# numclass = 10
+# confidence_scores = "max_class_probability-conf"
+# class_specific = True
 @pytest.mark.parametrize(
         "estim_algorithm, mode, metric, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
                                ["classification"],
-                            #    ["accuracy", "sensitivity", "precision", "f1score", "auc"],
-                               ["accuracy"],
+                               ["accuracy", "sensitivity", "precision", "f1score", "auc"],
                                moval.models.get_conf_options(),
                                [False, True])),
 )

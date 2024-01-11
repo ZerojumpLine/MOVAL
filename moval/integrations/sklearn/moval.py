@@ -163,7 +163,7 @@ class MOVAL(BaseEstimator):
                 )
                 solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
                 solver.fit(logits, gt) # model fitting
-                probability_cond = model.calculate_probability(logits) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
+                probability_cond = model.calculate_probability(logits, appr = True) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
                 #
                 models.append(model)
                 solvers.append(solver)
@@ -175,6 +175,7 @@ class MOVAL(BaseEstimator):
             probability = self.probability_aggregation(probabilities)
             self.model_ = models
             self.solver_ = solvers
+            print(f"Calculating and saving the fitted case-wise performance...")
             self.fitted_perf = self.get_case_perf(models[0], self.metric, logits, probability, gt)
             self.ensemble_conds = ensemble_conds
 
@@ -188,11 +189,12 @@ class MOVAL(BaseEstimator):
                 )
             solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
             solver.fit(logits, gt) # model fitting
-            probability = model.calculate_probability(logits)
+            probability = model.calculate_probability(logits, appr = True)
 
             # save the results to self attributes.
             self.model_ = model
             self.solver_ = solver
+            print(f"Calculating and saving the fitted case-wise performance...")
             self.fitted_perf = self.get_case_perf(model, self.metric, logits, probability, gt)
 
         if self.mode == "classification":
@@ -254,23 +256,7 @@ class MOVAL(BaseEstimator):
         """
 
         fitted_perf = []
-        if model.mode == "classification":
-            # probability of shape ``(n, d)```
-            for n_case in range(len(probability)):
-                if metric == "accuracy":
-                    estim_perf_case = model.estimate_accuracy(inp, probability)
-                elif metric == "sensitivity":
-                    estim_perf_case = model.estimate_sensitivity(inp, probability)
-                elif metric == "precision":
-                    estim_perf_case = model.estimate_precision(probability)
-                elif metric == "f1score":
-                    estim_perf_case = model.estimate_f1score(inp, probability)
-                elif metric == "auc":
-                    estim_perf_case = model.estimate_auc(probability)
-                else:
-                    ValueError(f"Unsupported metric '{metric}'")
-                fitted_perf.append(estim_perf_case)
-        else:
+        if model.mode == "segmentation":
             # generate gt_guide from gt here.
             gt_guide = []
             for n_case in range(len(gt)):
@@ -280,20 +266,29 @@ class MOVAL(BaseEstimator):
                     gt_exist.append(np.sum(gt_case == k_cls) > 0)
                 gt_guide.append(gt_exist)
             gt_guide = np.array(gt_guide)
-            # logits is a list of n ``(d, H, W, (D))``
-            for n_case in range(len(probability)):
-                if metric == "accuracy":
-                    estim_perf_case = model.estimate_accuracy(inp, probability, gt_guide = gt_guide)
-                elif metric == "sensitivity":
-                    estim_perf_case = model.estimate_sensitivity(inp, probability, gt_guide = gt_guide)
-                elif metric == "precision":
-                    estim_perf_case = model.estimate_precision(probability, gt_guide = gt_guide)
-                elif metric == "f1score":
-                    estim_perf_case = model.estimate_f1score(inp, probability, gt_guide = gt_guide)
-                elif metric == "auc":
-                    estim_perf_case = model.estimate_auc(probability, gt_guide = gt_guide)
-                else:
-                    ValueError(f"Unsupported metric '{metric}'")
+        else:
+            gt_guide = None
+
+        for n_case in range(len(probability)):
+            
+            if metric == "accuracy":
+                estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+            elif metric == "sensitivity":
+                estim_perf_case = model.estimate_sensitivity(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+            elif metric == "precision":
+                estim_perf_case = model.estimate_precision(probability[n_case:n_case + 1], gt_guide = gt_guide)
+            elif metric == "f1score":
+                estim_perf_case = model.estimate_f1score(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+            elif metric == "auc":
+                estim_perf_case = model.estimate_auc(probability[n_case:n_case + 1], gt_guide = gt_guide)
+            else:
+                ValueError(f"Unsupported metric '{metric}'")
+            
+            if metric == "accuracy":
+                fitted_perf.append(estim_perf_case)
+            elif model.mode == "classification":
+                fitted_perf.append(np.mean(estim_perf_case))
+            else:
                 fitted_perf.append(np.mean(estim_perf_case[1:]))
         
         return fitted_perf
@@ -442,8 +437,7 @@ class MOVAL(BaseEstimator):
                 If ``False``, it means that there isn't any manuel label of class d in this sample.
         
         Returns:
-            estim: estimated accuracy (float) for classification tasks, 
-                or class-wise estimated accuracy of shape ``(d-1, )`` for segmentation tasks.
+            estim: estimated accuracy (float). 
 
         Example:
 
@@ -479,28 +473,18 @@ class MOVAL(BaseEstimator):
                 estim_acc = np.mean(np.max(probability, axis = 1))
                 return estim_acc
             else:
-                estim_acc_allcls = []
-                for kcls in range(probability[0].shape[0]):
-                    scores_kcls = []
-                    for n_case in range(len(probability)):
-                        pred_case = np.argmax(logits[n_case], axis = 0) # ``(H, W, (D))``
-                        pred_flatten = pred_case.flatten() # ``n``
-                        score_flatten = np.max(probability[n_case], axis = 0).flatten() # ``n``
-                        score_flatten_kcls = score_flatten[np.where(pred_flatten == kcls)[0]]
-                        scores_kcls.append(score_flatten_kcls)
-                    estim_acc_allcls.append(np.mean( np.concatenate(scores_kcls) ))
-                estim_acc_allcls = np.array(estim_acc_allcls)
+                scores = []
+                for n_case in range(len(probability)):
+                    score_flatten = np.max(probability[n_case], axis = 0).flatten() # ``n``
+                    scores.append(score_flatten)
+                estim_acc = np.mean( np.concatenate(scores) )
                 
-                return estim_acc_allcls[1:]
+                return estim_acc
         else:
             model = self.model_
 
-            if self.mode == "classification":
-                estim_acc, _ = model.estimate_accuracy(logits)
-                return estim_acc
-            else:
-                _, estim_acc_allcls = model.estimate_accuracy(logits, gt_guide = gt_guide)
-                return estim_acc_allcls[1:]
+            estim_acc, _ = model.estimate_accuracy(logits)
+            return estim_acc
     
     def estimate_sensitivity(self,
                  logits: Union[List[Iterable], np.ndarray],

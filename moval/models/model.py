@@ -218,7 +218,7 @@ class Model(abc.ABC):
         
         Returns:
             estim_acc: A float scalar that represents the estimated accuracy for the given input data.
-            estim_cls: Estimated class-wise performance of shape ``(d, )``.
+            estim_cls: Estimated class-wise accuracy of shape ``(d, )``.
 
         """
 
