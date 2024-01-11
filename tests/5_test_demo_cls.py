@@ -61,9 +61,9 @@ results_files = "results_demo_cls.txt"
 if os.path.isfile(results_files):
     os.remove(results_files)
 
-# estim_algorithm = "ac-model"
+# estim_algorithm = "ts-model"
 # mode = "classification"
-# metric = "auc"
+# metric = "precision"
 # numclass = 10
 # confidence_scores = "max_class_probability-conf"
 # class_specific = True

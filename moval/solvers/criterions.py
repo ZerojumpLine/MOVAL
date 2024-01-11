@@ -74,12 +74,12 @@ class clsCalibrate(Calibrate):
             elif self.metric == "sensitivity":
                 sensitivities = []
                 for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(pred == kcls)[0]
+                    pos_cls = np.where(gt == kcls)[0]
                     # if there do not exist any samplies for class kcls
                     if len(pos_cls) == 0:
                         sensitivity_cls = -1
                     else:
-                        _, sensitivity_cls, _ = ComputMetric(pred == kcls, gt == kcls)
+                        _, sensitivity_cls, _ = ComputMetric(gt == kcls, pred == kcls)
                     sensitivities.append(sensitivity_cls)
                 sensitivities = np.array(sensitivities)
                 sensitivity_mean = sensitivities[sensitivities >= 0].mean()
@@ -90,12 +90,12 @@ class clsCalibrate(Calibrate):
             elif self.metric == "precision":
                 precisions = []
                 for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(pred == kcls)[0]
+                    pos_cls = np.where(gt == kcls)[0]
                     # if there do not exist any samplies for class kcls
                     if len(pos_cls) == 0:
                         precision_cls = -1
                     else:
-                        _, _, precision_cls = ComputMetric(pred == kcls, gt == kcls)
+                        _, _, precision_cls = ComputMetric(gt == kcls, pred == kcls)
                     precisions.append(precision_cls)
                 precisions = np.array(precisions)
                 precision_mean = precisions[precisions >= 0].mean()
@@ -106,12 +106,12 @@ class clsCalibrate(Calibrate):
             elif self.metric == "f1score":
                 f1scores = []
                 for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(pred == kcls)[0]
+                    pos_cls = np.where(gt == kcls)[0]
                     # if there do not exist any samplies for class kcls
                     if len(pos_cls) == 0:
                         f1score_cls = -1
                     else:
-                        f1score_cls, _, _ = ComputMetric(pred == kcls, gt == kcls)
+                        f1score_cls, _, _ = ComputMetric(gt == kcls, pred == kcls)
                     f1scores.append(f1score_cls)
                 f1scores = np.array(f1scores)
                 f1score_mean = f1scores[f1scores >= 0].mean()
@@ -214,7 +214,7 @@ class segCalibrate(Calibrate):
                         if np.sum(gt_case == kcls) == 0:
                             sensitivity_case[kcls] = -1
                         else:
-                            _, sensitivity_case[kcls], _ = ComputMetric(pred_case == kcls, gt_case == kcls)
+                            _, sensitivity_case[kcls], _ = ComputMetric(gt_case == kcls, pred_case == kcls)
                     sensitivity.append(sensitivity_case)
                 
                 # only aggregate the ones which are not -1
@@ -241,7 +241,7 @@ class segCalibrate(Calibrate):
                         if np.sum(gt_case == kcls) == 0:
                             precision_case[kcls] = -1
                         else:
-                            _, _, precision_case[kcls] = ComputMetric(pred_case == kcls, gt_case == kcls)
+                            _, _, precision_case[kcls] = ComputMetric(gt_case == kcls, pred_case == kcls)
                     precision.append(precision_case)
                 
                 # only aggregate the ones which are not -1
@@ -268,7 +268,7 @@ class segCalibrate(Calibrate):
                         if np.sum(gt_case == kcls) == 0:
                             dsc_case[kcls] = -1
                         else:
-                            dsc_case[kcls], _, _ = ComputMetric(pred_case == kcls, gt_case == kcls)
+                            dsc_case[kcls], _, _ = ComputMetric(gt_case == kcls, pred_case == kcls)
                     dsc.append(dsc_case)
                 
                 # only aggregate the ones which are not -1

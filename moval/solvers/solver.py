@@ -126,6 +126,35 @@ class Solver(abc.ABC):
 
         return err
 
+    def kcls_order_list(self, inp: np.ndarray, exclusive_background: bool = False) -> List[Iterable]:
+        """Generate a list of kcls, such that the predicted samples are in ascending order.
+
+        Args:
+            inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
+            exclusive_background: If ``False``, we exclude the background class (the most majority class).
+        
+        Return:
+            kcls_list: a list of class index. The first element should correspond to the most majority class.
+
+        """
+        numclass = self.model.num_class
+        kcls_sample = np.zeros(numclass)
+        if self.model.mode == "classification":
+            pred = np.argmax(inp, axis = 1)
+            for kcls in range(numclass):
+                kcls_sample[kcls] = kcls_sample[kcls] + np.sum(pred == kcls)
+        else:
+            for kcls in range(numclass):
+                for n_case in range(len(inp)):
+                    pred_case = np.argmax(inp[n_case], axis = 0)
+                    kcls_sample[kcls] = kcls_sample[kcls] + np.sum(pred_case == kcls)
+        
+        kcls_list = np.argsort(kcls_sample)
+        if exclusive_background:
+            kcls_list = kcls_list[:-1]
+
+        return kcls_list
+
     def fit(
         self,
         inp: Union[List[Iterable], np.ndarray],
@@ -180,23 +209,27 @@ class Solver(abc.ABC):
         optimization_method = 'Nelder-Mead'
         x0 = np.array([1.0])
         search_threshold = 0.01 # if the optimized results are larger than this, we go through the initial conditions
+        exclusive_background = False
 
         if self.model.mode == "classification":
             initial_conditions = [np.array([0.001]), np.array([0.1]), np.array([0.2]), np.array([0.3]), np.array([0.4]),
                                   np.array([0.5]), np.array([0.6]), np.array([0.7]), np.array([0.8]), np.array([0.9])]
             print(f"Opitimizing with {inp.shape[0]} samples...")
-            kcls_start = 0
+            
         else:
             initial_conditions = [np.array([0.001]), np.array([0.5])]
             print(f"Opitimizing with {len(inp)} samples...")
             print("Be patient, it should take a while...")
-            if self.metric == "accuracy":
-                kcls_start = 0
-            else:
-                kcls_start = 1 # leave the background class uncalibrated.
+            if self.metric != "accuracy":
+                exclusive_background = True # leave the background class uncalibrated.
+
+        # generate a list of length kcls, from high to low
+        kcls_list = self.kcls_order_list(self.inp, exclusive_background)
 
         if self.class_specific:
-            for kcls in range(kcls_start, self.model.num_class):
+            if self.metric != "precision":
+                kcls_list = kcls_list[::-1]
+            for kcls in kcls_list:
                 self.kcls = kcls
                 optimization_result = scipy.optimize.minimize(
                                 fun = self.eval_func,
@@ -209,7 +242,7 @@ class Solver(abc.ABC):
 
                 if optimization_result.fun > search_threshold:
                     # change the initial state, if we are not satisfied with the optimization results.
-                    print(f"Not satisfied with initial optimization results of param, trying more initial states...")
+                    print(f"Not satisfied with initial optimization results of param for class {kcls}, trying more initial states...")
                     results = []
                     results.append((optimization_result.fun, optimization_result.x[0]))
                     cnt_guess = 0
@@ -269,7 +302,9 @@ class Solver(abc.ABC):
                     self.model.param = np.array([1])
 
             if self.class_specific:
-                for kcls in range(kcls_start, self.model.num_class):
+                if self.metric != "precision":
+                    kcls_list = kcls_list[::-1]
+                for kcls in kcls_list:
                     self.kcls = kcls
                     optimization_result = scipy.optimize.minimize(
                                     fun = self.eval_func_ext,
@@ -282,7 +317,7 @@ class Solver(abc.ABC):
 
                     if optimization_result.fun > search_threshold:
                         # change the initial state, if we are not satisfied with the optimization results.
-                        print(f"Not satisfied with initial optimization results of param_ext, trying more initial states...")
+                        print(f"Not satisfied with initial optimization results of param for class {kcls}, trying more initial states...")
                         results = []
                         results.append((optimization_result.fun, optimization_result.x[0]))
                         cnt_guess = 0

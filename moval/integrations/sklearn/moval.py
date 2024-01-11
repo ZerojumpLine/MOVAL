@@ -161,6 +161,19 @@ class MOVAL(BaseEstimator):
                     confidence_scores = confidence_scores,
                     class_specific = class_specific
                 )
+                if class_specific == True and self.metric != "accuracy":
+                    # find a good initatlization, as other metrics would also depend on non-maximum logits
+                    # should be critical for precision estimation
+                    model_pre = moval.models.init(
+                        self.estim_algorithm,
+                        mode = self.mode,
+                        num_class = self.numclass,
+                        confidence_scores = self.confidence_scores,
+                        class_specific = False
+                        )
+                    solver_pre = moval.solvers.init("base-solver", model = model_pre, metric = "accuracy")
+                    solver_pre.fit(logits, gt)
+                    model.param = np.ones(self.numclass) * model_pre.param
                 solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
                 solver.fit(logits, gt) # model fitting
                 probability_cond = model.calculate_probability(logits, appr = True) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
@@ -187,6 +200,19 @@ class MOVAL(BaseEstimator):
                 confidence_scores = self.confidence_scores,
                 class_specific = self.class_specific
                 )
+            if self.class_specific == True and self.metric != "accuracy":
+                # find a good initatlization, as other metrics would also depend on non-maximum logits
+                # should be critical for precision estimation
+                model_pre = moval.models.init(
+                    self.estim_algorithm,
+                    mode = self.mode,
+                    num_class = self.numclass,
+                    confidence_scores = self.confidence_scores,
+                    class_specific = False
+                    )
+                solver_pre = moval.solvers.init("base-solver", model = model_pre, metric = "accuracy")
+                solver_pre.fit(logits, gt)
+                model.param = np.ones(self.numclass) * model_pre.param
             solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
             solver.fit(logits, gt) # model fitting
             probability = model.calculate_probability(logits, appr = True)
