@@ -63,10 +63,10 @@ if os.path.isfile(results_files):
 
 # estim_algorithm = "ts-model"
 # mode = "classification"
-# metric = "precision"
+# metric = "auc"
 # numclass = 10
-# confidence_scores = "max_class_probability-conf"
-# class_specific = True
+# confidence_scores = "doctor-conf"
+# class_specific = False
 @pytest.mark.parametrize(
         "estim_algorithm, mode, metric, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
