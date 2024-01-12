@@ -227,7 +227,7 @@ class Solver(abc.ABC):
         kcls_list = self.kcls_order_list(self.inp, exclusive_background)
 
         if self.class_specific:
-            if self.metric != "precision":
+            if self.metric != "precision" and self.metric != "auc":
                 kcls_list = kcls_list[::-1]
             for kcls in kcls_list:
                 self.kcls = kcls
@@ -302,7 +302,7 @@ class Solver(abc.ABC):
                     self.model.param = np.array([1])
 
             if self.class_specific:
-                if self.metric != "precision":
+                if self.metric != "precision" and self.metric != "auc":
                     kcls_list = kcls_list[::-1]
                 for kcls in kcls_list:
                     self.kcls = kcls

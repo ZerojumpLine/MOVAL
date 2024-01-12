@@ -240,10 +240,13 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
 
     """
     
-    thresholds = [0.00001, 0.0001, 0.001, 0.01, 0.05, 
-                  0.1, 0.2, 0.3, 0.4, 0.5, 
-                  0.6, 0.7, 0.8, 0.9, 0.95, 
-                  0.99, 0.999, 0.9999, 0.99999]
+    # thresholds = [0.00001, 0.0001, 0.001, 0.01, 0.05, 
+    #               0.1, 0.2, 0.3, 0.4, 0.5, 
+    #               0.6, 0.7, 0.8, 0.9, 0.95, 
+    #               0.99, 0.999, 0.9999, 0.99999]
+    
+    # accelerate
+    thresholds = [0.1, 0.3, 0.5, 0.7, 0.9, 0.99, 0.999, 0.9999]
     
     y = np.argmax(x, axis = 1) # this is not important, just a placeholder of shape ``(n, (H), (W), (D))``
     shp_x = x.shape
