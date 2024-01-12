@@ -504,6 +504,9 @@ class Model(abc.ABC):
         Note:
             The calibrated probability should have the same dimension with network outputs.
             The calculation is slow as we need to go through every samples.
+        
+        Update:
+            The function is barely used now, as it is too slow!
 
         Args:
             inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.

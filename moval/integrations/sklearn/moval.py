@@ -287,7 +287,7 @@ class MOVAL(BaseEstimator):
 
             if metric == "accuracy":
                 for n_case in range(len(probability)):
-                    estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], probability[n_case:n_case + 1])
+                    estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1])
                     fitted_perf.append(estim_perf_case)
             elif metric == "sensitivity":
                 estim_perf_case = model.estimate_sensitivity(inp, probability)
@@ -319,7 +319,7 @@ class MOVAL(BaseEstimator):
             for n_case in range(len(probability)):
                 
                 if metric == "accuracy":
-                    estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+                    estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], gt_guide = gt_guide)
                 elif metric == "sensitivity":
                     estim_perf_case = model.estimate_sensitivity(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
                 elif metric == "precision":

@@ -245,9 +245,6 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
     #               0.6, 0.7, 0.8, 0.9, 0.95, 
     #               0.99, 0.999, 0.9999, 0.99999]
     
-    # accelerate
-    thresholds = [0.1, 0.3, 0.5, 0.7, 0.9, 0.99, 0.999, 0.9999]
-    
     y = np.argmax(x, axis = 1) # this is not important, just a placeholder of shape ``(n, (H), (W), (D))``
     shp_x = x.shape
     square = False
@@ -260,6 +257,16 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
     for test_cls in range(x.shape[1]):
         # low thres -> high FPR -> high sensitivity (TPR)
         # obtain TPRs and FPRs
+
+        # customize thresholds
+        # generate thresholds that fit the probability, just in case tpr == 0
+        prob_max = np.min((np.max(x[:, test_cls]) - 0.05, 1.))
+        prob_min = np.max((np.min(x[:, test_cls]) + 0.05, 0.))
+        num_points = 10
+
+        interval = (prob_max - prob_min) / (num_points - 1)
+        thresholds = [prob_min + i * interval for i in range(num_points)]
+
         TPRs = []
         FPRs = []
         #
@@ -298,6 +305,7 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
         FPRall.append(FPRs)
     
     return np.array(AUCs), TPRall, FPRall
+
 
 def one_hot_embedding(labels: np.ndarray, num_class: int) -> np.ndarray:
     """Embedding labels to one-hot form.
