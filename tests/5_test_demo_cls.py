@@ -66,7 +66,7 @@ if os.path.isfile(results_files):
 # metric = "accuracy"
 # numclass = 10
 # confidence_scores = "doctor-conf"
-# class_specific = False
+# class_specific = True
 @pytest.mark.parametrize(
         "estim_algorithm, mode, metric, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),

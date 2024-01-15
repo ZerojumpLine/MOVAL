@@ -212,12 +212,30 @@ class Solver(abc.ABC):
         exclusive_background = False
 
         if self.model.mode == "classification":
-            initial_conditions = [np.array([0.001]), np.array([0.1]), np.array([0.2]), np.array([0.3]), np.array([0.4]),
-                                  np.array([0.5]), np.array([0.6]), np.array([0.7]), np.array([0.8]), np.array([0.9])]
+            initial_conditions_atc = [np.array([0.01]), np.array([0.1]), np.array([0.3]), np.array([0.5]), np.array([0.9])]
+            if self.model.estim_algorithm == "atc-model":
+                # the range of atc estimation is [0, 1].
+                initial_conditions = [np.array([0.01]), np.array([0.1]), np.array([0.3]), np.array([0.5]), np.array([0.9])]
+            elif self.model.estim_algorithm == "doc-model":
+                # the range of doc estimation is [0, 2].
+                initial_conditions = [np.array([0.01]), np.array([0.1]), np.array([0.5]), np.array([1.5]), np.array([1.8])]
+            else:
+                # the range of ts estimation is [0, inf].
+                initial_conditions = [np.array([0.01]), np.array([0.5]), np.array([3.]), np.array([5.]), np.array([10.])]
             print(f"Opitimizing with {inp.shape[0]} samples...")
             
         else:
-            initial_conditions = [np.array([0.001]), np.array([0.5])]
+            initial_conditions_atc = [np.array([0.01]), np.array([0.5])]
+            if self.model.estim_algorithm == "atc-model":
+                # the range of atc estimation is [0, 1].
+                initial_conditions = [np.array([0.01]), np.array([0.5])]
+            elif self.model.estim_algorithm == "doc-model":
+                # the range of doc estimation is [0, 2].
+                initial_conditions = [np.array([0.01]), np.array([1.5])]
+            else:
+                # the range of ts estimation is [0, inf].
+                initial_conditions = [np.array([0.01]), np.array([5])]
+
             print(f"Opitimizing with {len(inp)} samples...")
             print("Be patient, it should take a while...")
             if self.metric != "accuracy":
@@ -313,7 +331,7 @@ class Solver(abc.ABC):
                         results = []
                         results.append((optimization_result.fun, optimization_result.x[0]))
                         cnt_guess = 0
-                        for initial_guess in initial_conditions:
+                        for initial_guess in initial_conditions_atc:
                             optimization_result = scipy.optimize.minimize(
                                     fun = self.eval_func_ext,
                                     x0 = initial_guess,
@@ -322,7 +340,7 @@ class Solver(abc.ABC):
                                     tol = 1e-07)
                             results.append((optimization_result.fun, optimization_result.x[0]))
                             cnt_guess += 1
-                            print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
+                            print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
                         
                         optimized_param = min(results, key=lambda x: x[0])[1]
 
@@ -344,7 +362,7 @@ class Solver(abc.ABC):
                     results = []
                     results.append((optimization_result.fun, optimization_result.x))
                     cnt_guess = 0
-                    for initial_guess in initial_conditions:
+                    for initial_guess in initial_conditions_atc:
                         optimization_result = scipy.optimize.minimize(
                                 fun = self.eval_func_ext,
                                 x0 = initial_guess,
@@ -353,7 +371,7 @@ class Solver(abc.ABC):
                                 tol = 1e-07)
                         results.append((optimization_result.fun, optimization_result.x))
                         cnt_guess += 1
-                        print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
+                        print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
                     
                     optimized_param = min(results, key=lambda x: x[0])[1]
 
