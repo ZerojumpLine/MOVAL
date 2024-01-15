@@ -292,14 +292,6 @@ class Solver(abc.ABC):
             self.model.param = optimized_param
 
         if self.model.extend_param:
-            # If the model needs normalization, it learns ``min_value`` during the first stage
-            # It is maybe not desrible for the second stage, sometimes hurt performance.
-            # Therefore, here we decards the learned parameters.
-            if self.model.conf.normalization:
-                if self.model.class_specific:
-                    self.model.param = np.ones(self.model.num_class)
-                else:
-                    self.model.param = np.array([1])
 
             if self.class_specific:
                 if self.metric != "precision" and self.metric != "auc":

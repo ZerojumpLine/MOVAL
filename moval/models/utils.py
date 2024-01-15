@@ -33,13 +33,9 @@ def cal_energy(x: np.ndarray, T = 1) -> np.ndarray:
     
     Returns:
         energy: The calculated energy of shape ``(n, )``
-    
-    Note:
-        We do not acutally utilize T to calibrate the model here, as the score is unbounded.
-        Instead, we utilize the model parameter to normalize the score.
 
     """
-    T = 1
+
     denominator = np.sum(np.exp(x.transpose() / T), axis=0)
     energy = - T * np.log(denominator)
 
@@ -94,13 +90,9 @@ def cal_doctor(x: np.ndarray, T = 1) -> np.ndarray:
     
     Returns:
         doctor: The calculated doctor of shape ``(n, )``
-    
-    Note:
-        We do not acutally utilize T to calibrate the model here, as the score is unbounded.
-        Instead, we utilize the model parameter to normalize the score.
 
     """
-    T = 1
+
     p = cal_softmax(x, T = T)
     g = np.sum(p ** 2, axis=1)
     doctor = (1 - g) / g
@@ -262,7 +254,7 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
         # generate thresholds that fit the probability, just in case tpr == 0
         prob_max = np.min((np.max(x[:, test_cls]) - 0.05, 1.))
         prob_min = np.max((np.min(x[:, test_cls]) + 0.05, 0.))
-        num_points = 10
+        num_points = 5 # this might is too small, but I need to accelerate the optimization process.
 
         interval = (prob_max - prob_min) / (num_points - 1)
         thresholds = [prob_min + i * interval for i in range(num_points)]

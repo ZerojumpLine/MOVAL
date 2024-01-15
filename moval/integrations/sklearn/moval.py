@@ -56,7 +56,8 @@ class MOVAL(BaseEstimator):
     ):
         self.__dict__.update(locals())
 
-        if self.estim_algorithm == 'moval-ensemble' or self.estim_algorithm == 'moval-ensemble-2' or self.estim_algorithm == 'moval-ensemble-triathlon':
+        # decide if the model is in the ensemble mode
+        if self.estim_algorithm.split('-')[1] == 'ensemble':
             self.ensemble = True
         else:
             self.ensemble = False
@@ -134,19 +135,27 @@ class MOVAL(BaseEstimator):
         else:
             self.numclass = logits.shape[-1]
 
-        if self.estim_algorithm == 'moval-ensemble':
+        if self.estim_algorithm == "moval-ensemble":
+            # All the CS variants
             moval_models = list(itertools.product(
-                ['ts-model', 'doc-model', 'atc-model', 'ts-atc-model'],
+                ["ts-model", "doc-model", "atc-model", "ts-atc-model"],
                 [self.mode],
                 moval.models.get_conf_options(),
                 [True]))
-        elif self.estim_algorithm == 'moval-ensemble-triathlon':
+        elif self.estim_algorithm == "moval-ensemble-triathlon":
+            # All the CS variants that support the estimation of all metrics
             # cannot utilize atc model family as they cannot estimate false positives.
             moval_models = list(itertools.product(
-                ['ts-model', 'doc-model'],
+                ["ts-model", "doc-model"],
                 [self.mode],
                 moval.models.get_conf_options(),
                 [True]))
+        elif self.estim_algorithm == "moval-ensemble-debug":
+            # just for debuging, aggregating 2 conditions.
+            moval_models = []
+            moval_models.append(["ts-model", self.mode, "energy-conf", True])
+            moval_models.append(["doc-model", self.mode, "max_class_probability-conf", False])
+
 
         if self.ensemble:
             ensemble_conds = []
@@ -165,7 +174,7 @@ class MOVAL(BaseEstimator):
                     # find a good initatlization, as other metrics would also depend on non-maximum logits
                     # should be critical for precision estimation
                     model_pre = moval.models.init(
-                        self.estim_algorithm,
+                        estim_algorithm,
                         mode = self.mode,
                         num_class = self.numclass,
                         confidence_scores = self.confidence_scores,
@@ -453,7 +462,7 @@ class MOVAL(BaseEstimator):
             >>> import moval
             >>> import numpy as np
             >>> logits = np.random.randn(1000, 10)
-            >>> moval_model = moval.MOVAL()
+            >>> moval_model = moval.MOVAL(confidence_scores = "moval-ensemble")
             >>> probability = moval_model.get_probability(logits)
         
         """
@@ -464,12 +473,12 @@ class MOVAL(BaseEstimator):
                 probability_cond = model.calculate_probability(logits, appr = True)
 
                 probabilities.append(probability_cond)
-                probability = self.probability_aggregation(probabilities)
+            probability = self.probability_aggregation(probabilities)
         else:
             model = self.model_
             probability = model.calculate_probability(logits, appr = True)
 
-            return probability
+        return probability
 
     def estimate_accuracy(self,
                  logits: Union[List[Iterable], np.ndarray],

@@ -145,78 +145,21 @@ class Model(abc.ABC):
 
         if isinstance(scores, list):
             
-            _normalized_scores = []
+            normalized_scores = []
             for n_case in range(len(scores)):
-                _normalized_scores.append( (scores[n_case] - self.min_value) / (self.max_value - self.min_value + e1) )
-
+                normalized_score =  (scores[n_case] - self.min_value) / (self.max_value - self.min_value + e1)
+                # normalized_score has shape ``(H, W, (D))``
+                # restrict the scores to the range of [0, 1]
+                normalized_score = np.clip(normalized_score, 0, 1)
+                normalized_scores.append(normalized_score)
         else:
 
             normalized_scores = (scores - self.min_value) / (self.max_value - self.min_value + e1)
+            # normalized_scores has shape ``(n, )``
+            # restrict the scores to the range of [0, 1]
+            normalized_scores = np.clip(normalized_scores, 0, 1)
                 
         return normalized_scores
-    
-    def pseduo_temperature_calibrate(self, scores: Union[List[Iterable], np.ndarray], pred: Union[List[Iterable], np.ndarray], T: np.ndarray = None,) -> Union[List[Iterable], np.ndarray]:
-        """Calibrate the confidence score based on temperature scaling but with pseudo-temperature.
-        
-        Notes:
-            As the scores have been already normalized, here we return scores^T. In this way, larger T lead to low probability and smaller T leads to larger probability.
-            Meanwhile, the scores would be still normalized after calibration.
-
-        Args:
-            scores: The unbounded confidence scores, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
-            e1: A small number to prevent unexpected results of division.
-            pred: The prediction derived from the logits, of shape ``(n, )`` or a list of n ``(H, W, (D))``, used for class-specific operation.
-            T: The pseduo-temperature to calibrate the confidence scores of shape ``(d, )`` for class-specific or ``(1, )`` for class-agnostic.
-                Larger T will make the score smaller, vice versa.
-
-        Returns:
-            calibrated_scores: The calibrated confidence scores, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
-        
-        """
-
-        if isinstance(scores, list):
-            
-            calibrated_scores = []
-
-            for n_case in range(len(scores)):
-
-                # reshape scores, pred to vectors.
-                inp_shape = scores[n_case].shape
-
-                # flaten the logit for segmentation.
-                calibrated_score = scores[n_case].reshape((-1))
-                pred_case = pred[n_case].reshape((-1))
-
-                # calibrated_scores now is of shape ``(n, )``
-                # pred now is of shape ``(n, )``
-
-                if not self.class_specific:
-                    calibrated_score = calibrated_score ** self.param
-                else:
-                    # class-wise average confidence
-                    for kcls in range(self.num_class):
-                        pos_cls = np.where(pred_case == kcls)[0]
-                        calibrated_score[pos_cls] = calibrated_score[pos_cls] ** self.param[kcls]
-                
-                calibrated_score = calibrated_score.reshape(inp_shape)
-
-                calibrated_scores.append(calibrated_score)
-
-            return calibrated_scores
-
-        else:
-            # scores now is of shape ``(n, )``
-            # pred now is of shape ``(n, )``
-
-            if not self.class_specific:
-                calibrated_scores = scores ** self.param
-            else:
-                # class-wise average confidence
-                for kcls in range(self.num_class):
-                    pos_cls = np.where(pred == kcls)[0]
-                    calibrated_scores[pos_cls] = scores[pos_cls] ** self.param[kcls]
-
-            return calibrated_scores
     
     def estimate_accuracy(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
         """Estimate the accuracy using network output.
@@ -719,10 +662,8 @@ class tsModel(Model):
         if self.conf.normalization:
             
             if self.mode == "classification":
-                pred = np.argmax(inp, axis = 1)
                 score = self._normalize(score)
                 # score is in range [0, 1], now we need to calibrate the confidence score with pseudo-temperature
-                score = self.pseduo_temperature_calibrate(score, pred = pred, T = self.param)
             elif self.mode == "segmentation":
                 preds = []
                 for n_case in range(len(score)):
@@ -730,7 +671,6 @@ class tsModel(Model):
                     preds.append(pred_case)
                 score = self._normalize(score)
                 # score is in range [0, 1], now we need to calibrate the confidence score with pseudo-temperature
-                score = self.pseduo_temperature_calibrate(score, pred = preds, T = self.param)
             else:
                 raise ValueError(f"Unknown mode '{self.mode}'")
         
@@ -775,12 +715,13 @@ class docModel(Model):
 
         if not self.class_specific:
             if self.mode == "classification":
-                return score - (1 - self.param)
+                score = score - (1 - self.param)
+                return np.clip(score, 0, 1)
             elif self.mode == "segmentation":
                 score_post = []
                 for n_case in range(len(score)):
                     score_case = score[n_case] - (1 - self.param)
-                    score_post.append(score_case)
+                    score_post.append(np.clip(score_case, 0, 1))
                 return score_post
             else:
                 raise ValueError(f"Unknown mode '{self.mode}'")
@@ -791,7 +732,7 @@ class docModel(Model):
                 for kcls in range(inp.shape[1]):
                     pos_cls = np.where(pred == kcls)[0]
                     score[pos_cls] = score[pos_cls] - (1 - self.param[kcls])
-                return score
+                return np.clip(score, 0, 1)
             elif self.mode == "segmentation":
                 score_post = []
                 for n_case in range(len(score)):
@@ -805,7 +746,7 @@ class docModel(Model):
                         pos_flatten_cls = np.where(pred_flatten == kcls)[0]
                         score_flatten[pos_flatten_cls] = score_flatten[pos_flatten_cls] - (1 - self.param[kcls])
                         score_reshape = score_flatten.reshape(score_shape) # ``(H, W, (D))``
-                    score_post.append(score_reshape)
+                    score_post.append(np.clip(score_reshape, 0, 1))
                 return score_post
             else:
                 raise ValueError(f"Unknown mode '{self.mode}'")
@@ -923,14 +864,12 @@ class tsatcModel(Model):
             if self.mode == "classification":
                 pred = np.argmax(inp, axis = 1)
                 _score = self._normalize(_score)
-                _score = self.pseduo_temperature_calibrate(_score, pred = pred, T = self.param)
             elif self.mode == "segmentation":
                 preds = []
                 for n_case in range(len(_score)):
                     pred_case = np.argmax(inp[n_case], axis = 0)
                     preds.append(pred_case)
                 _score = self._normalize(_score)
-                _score = self.pseduo_temperature_calibrate(_score, pred = preds, T = self.param)
             else:
                 raise ValueError(f"Unknown mode '{self.mode}'") 
 
@@ -983,5 +922,3 @@ class tsatcModel(Model):
                 return score_post
             else:
                 raise ValueError(f"Unknown mode '{self.mode}'")
-
-        return score

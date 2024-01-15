@@ -106,22 +106,25 @@ results_files = "results_demo_seg_2d.txt"
 if os.path.isfile(results_files):
     os.remove(results_files)
 
-# estim_algorithm = "ts-model"
+# estim_algorithm = "doc-model"
 # mode = "segmentation"
-# confidence_scores = "max_class_probability-conf"
-# class_specific = True
+# metric = "precision"
+# confidence_scores = "entropy-conf"
+# class_specific = False
 
 @pytest.mark.parametrize(
-        "estim_algorithm, mode, confidence_scores, class_specific", 
+        "estim_algorithm, mode, metric, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
                                ["segmentation"],
+                               ["f1score", "sensitivity", "precision"],
                                moval.models.get_conf_options(),
                                [False, True])),
 )
-def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
+def test_seg_3d(estim_algorithm, mode, metric, confidence_scores, class_specific):
 
     moval_model = moval.MOVAL(
                 mode = mode,
+                metric = metric,
                 confidence_scores = confidence_scores,
                 estim_algorithm = estim_algorithm,
                 class_specific = class_specific
@@ -129,44 +132,60 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
 
     #
     moval_model.fit(logits, gt)
-    estim_dsc = moval_model.estimate(logits)
+    estim_metric = moval_model.estimate(logits)
     
-    DSC_list = []
+    metric_list = []
     for n_case in range(len(logits)):
         pred_case   = np.argmax(logits[n_case], axis = 0) # ``(H, W, (D))``
         gt_case     = gt[n_case] # ``(H, W, (D))``
 
-        DSC, _, _ = ComputMetric(pred_case == 1, gt_case == 1)
-        DSC_list.append(DSC)
-    m_DSC = np.mean(np.array(DSC_list))
+        DSC, SEN, PRC = ComputMetric(pred_case == 1, gt_case == 1)
+        
+        if metric == "f1score":
+            metric_list.append(DSC)
+        elif metric == "sensitivity":
+            metric_list.append(SEN)
+        elif metric == "precision":
+            metric_list.append(PRC)
+        else:
+            ValueError(f"Not implemented real metric calculation of {metric}")
+    m_metric = np.mean(np.array(metric_list))
     
-    err_val_dsc = np.abs( m_DSC - estim_dsc )
+    err_val = np.abs( m_metric - estim_metric )
 
     # save the test err in the result files.
 
-    estim_dsc_test = moval_model.estimate(logits_test)
+    estim_test = moval_model.estimate(logits_test)
 
-    DSC_list_test = []
+    metric_list_test = []
     for n_case in range(len(logits_test)):
         pred_case   = np.argmax(logits_test[n_case], axis = 0) # ``(H, W, (D))``
         gt_case     = gt_test[n_case] # ``(H, W, (D))``
 
-        DSC, _, _ = ComputMetric(pred_case == 1, gt_case == 1)
-        DSC_list_test.append(DSC)
-    m_DSC_test = np.mean(np.array(DSC_list_test))
+        DSC, SEN, PRC = ComputMetric(pred_case == 1, gt_case == 1)
+        if metric == "f1score":
+            metric_list_test.append(DSC)
+        elif metric == "sensitivity":
+            metric_list_test.append(SEN)
+        elif metric == "precision":
+            metric_list_test.append(PRC)
+        else:
+            ValueError(f"Not implemented real metric calculation of {metric}")
 
-    err_test = np.abs( m_DSC_test - estim_dsc_test )
+    m_metric_test = np.mean(np.array(metric_list_test))
 
-    test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
+    err_test = np.abs( m_metric_test - estim_test )
+
+    test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, metric = {metric}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
 
     with open(results_files, 'a') as f:
         f.write(test_condition)
         f.write('\n')
-        f.write("validation dsc err: ")
-        f.write(str(err_val_dsc))
+        f.write("validation metric err: ")
+        f.write(str(err_val))
         f.write('\n')
-        f.write("validation predicted dsc: ")
-        f.write(str(estim_dsc))
+        f.write("validation predicted metric: ")
+        f.write(str(estim_metric))
         f.write('\n')
         f.write("moval parameter: ")
         f.write(str(moval_model.model_.param))
@@ -175,7 +194,7 @@ def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
             f.write("moval extended parameter: ")
             f.write(str(moval_model.model_.param_ext))
             f.write('\n')
-        f.write("test err: ")
+        f.write("test metric err: ")
         f.write(str(err_test))
         f.write('\n')
         f.write('\n')

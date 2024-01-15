@@ -1,0 +1,49 @@
+estim_algorithm = moval-ensemble-debug, mode = classification, metric = accuracy
+validation err: 0.0006625495941802173
+moval ensembling conditions: ['estim_algorithm_ts-model_mode_classification_confidence_scores_energy-conf_class_specific_True', 'estim_algorithm_doc-model_mode_classification_confidence_scores_max_class_probability-conf_class_specific_False']
+moval parameter: [5.00071335e-01 4.28533325e-01 2.86015091e-01 4.17436981e-01
+ 1.71106396e-01 1.91937904e-01 6.17356110e-02 3.28127289e-02
+ 1.00000000e-06 1.29991211e-02]
+moval parameter: [0.79471436]
+real metric: 0.5832
+estimated metric: 0.6665807087468058
+
+estim_algorithm = moval-ensemble-debug, mode = classification, metric = sensitivity
+validation err: 0.0008165746462034384
+moval ensembling conditions: ['estim_algorithm_ts-model_mode_classification_confidence_scores_energy-conf_class_specific_True', 'estim_algorithm_doc-model_mode_classification_confidence_scores_max_class_probability-conf_class_specific_False']
+moval parameter: [0.02466225 0.0198777  0.13440948 0.16297651 0.19535454 0.3527051
+ 0.261809   0.41729747 0.80951881 0.72720843]
+moval parameter: [0.79471436]
+real metric: 0.5841880762686897
+estimated metric: 0.6786892324435828
+
+estim_algorithm = moval-ensemble-debug, mode = classification, metric = precision
+validation err: 0.04298227793881837
+moval ensembling conditions: ['estim_algorithm_ts-model_mode_classification_confidence_scores_energy-conf_class_specific_True', 'estim_algorithm_doc-model_mode_classification_confidence_scores_max_class_probability-conf_class_specific_False']
+moval parameter: [2.44651518e+00 1.00000000e-06 1.00000000e-06 3.66723633e-02
+ 1.00000000e-06 1.00000000e-06 1.00000000e-06 1.00000000e-06
+ 1.00000000e-06 1.00000000e-06]
+moval parameter: [0.79471436]
+real metric: 0.7401564026879803
+estimated metric: 0.658984622519339
+
+estim_algorithm = moval-ensemble-debug, mode = classification, metric = f1score
+validation err: 0.028644627442856008
+moval ensembling conditions: ['estim_algorithm_ts-model_mode_classification_confidence_scores_energy-conf_class_specific_True', 'estim_algorithm_doc-model_mode_classification_confidence_scores_max_class_probability-conf_class_specific_False']
+moval parameter: [2.28197107e-01 1.00000000e-06 1.20446081e-01 2.62975245e-01
+ 4.31192017e-02 1.98040104e-01 4.91882515e-02 1.72056152e-01
+ 4.68230352e-01 3.70531445e-01]
+moval parameter: [0.79471436]
+real metric: 0.560230179737576
+estimated metric: 0.6651661817869448
+
+estim_algorithm = moval-ensemble-debug, mode = classification, metric = auc
+validation err: 0.048527729377414786
+moval ensembling conditions: ['estim_algorithm_ts-model_mode_classification_confidence_scores_energy-conf_class_specific_True', 'estim_algorithm_doc-model_mode_classification_confidence_scores_max_class_probability-conf_class_specific_False']
+moval parameter: [1.43890381e-02 1.15352344e+02 1.26452148e-02 1.40124023e-01
+ 5.20703125e-04 1.57904297e-02 1.00000000e-06 1.00000000e-06
+ 1.00000000e-06 1.00000000e-06]
+moval parameter: [0.79471436]
+real metric: 0.9491638006900998
+estimated metric: 0.8948469945679441
+

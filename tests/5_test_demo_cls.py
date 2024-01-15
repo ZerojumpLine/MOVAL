@@ -63,7 +63,7 @@ if os.path.isfile(results_files):
 
 # estim_algorithm = "ts-model"
 # mode = "classification"
-# metric = "auc"
+# metric = "accuracy"
 # numclass = 10
 # confidence_scores = "doctor-conf"
 # class_specific = False

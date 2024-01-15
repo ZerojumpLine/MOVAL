@@ -122,16 +122,18 @@ if os.path.isfile(results_files):
 # class_specific = True
 
 @pytest.mark.parametrize(
-        "estim_algorithm, mode, confidence_scores, class_specific", 
+        "estim_algorithm, mode, metric, confidence_scores, class_specific", 
         list(itertools.product(moval.models.get_estim_options(),
                                ["segmentation"],
+                               ["f1score"],
                                moval.models.get_conf_options(),
                                [False, True])),
 )
-def test_seg_3d(estim_algorithm, mode, confidence_scores, class_specific):
+def test_seg_3d(estim_algorithm, mode, metric, confidence_scores, class_specific):
 
     moval_model = moval.MOVAL(
                 mode = mode,
+                metric = metric,
                 confidence_scores = confidence_scores,
                 estim_algorithm = estim_algorithm,
                 class_specific = class_specific,
