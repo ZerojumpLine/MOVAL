@@ -1,4 +1,17 @@
-# MOVAL [![PyPI version](https://badge.fury.io/py/moval.svg)](https://badge.fury.io/py/moval)
+# MOVAL 
+
+<div align="center">
+
+[📖 Documentation](https://moval.readthedocs.io/en/latest/index.html) |
+[🏠 Home Page](https://zerojumpline.github.io/moval)
+
+
+[![PyPI version](https://badge.fury.io/py/moval.svg)](https://badge.fury.io/py/moval)
+
+
+</div>
+
+
 
 **MOVAL** is a Python package designed for assessing model performance in the absence of ground truth labels. It computes and calibrated confidence scores to accurately reflect the likelihood of predictions, leveraging these calibrated confidence scores to estimate the model's overall performance. Notably, MOVAL operates without the need for ground truth labels in the target domains and supports the evaluation of model performance in classification, 2D segmentation, and 3D segmentation.
 
