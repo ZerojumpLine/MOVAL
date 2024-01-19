@@ -1,4 +1,13 @@
-# MOVAL 
+<h1 align="center">
+  <a href="https://zerojumpline.github.io/moval">
+    <img src="https://github.com/ZerojumpLine/MOVAL/blob/main/docs/logo.png?raw=True" alt="Logo" width="120" height="120">
+  </a>
+  <br/>
+  MOVAL
+</h1>
+
+<p align="center"><strong>Estimating performance for safe deployment of machine learning models</strong></p>
+
 
 <div align="center">
 
