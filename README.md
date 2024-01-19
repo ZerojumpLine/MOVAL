@@ -1,6 +1,6 @@
 <h1 align="center">
   <a href="https://zerojumpline.github.io/moval">
-    <img src="https://github.com/ZerojumpLine/MOVAL/blob/main/docs/logo.png?raw=True" alt="Logo" width="120" height="120">
+    <img src="https://github.com/ZerojumpLine/MOVAL/blob/main/docs/logo.png?raw=True" alt="Logo" width="180" height="180">
   </a>
   <br/>
   MOVAL
@@ -27,7 +27,7 @@
 **MOVAL** highlights a key feature—class-wise calibration, recognized as essential for addressing long-tailed distributions commonly found in real-world datasets. This proves especially significant in segmentation tasks where background samples often outnumber foregrounds. The inclusion of class-specific variants becomes crucial for accurately estimating segmentation performance. Additionally, MOVAL offers support for various types of confidence scores, enhancing its versatility.
 
 What it offers:
-<br/> <div align=center><img src="https://github.com/ZerojumpLine/MOVAL/blob/main/docs/software_features.png?raw=True" width="750px"/></div>
+<br/> <div align=center><img src="https://github.com/ZerojumpLine/MOVAL/blob/main/docs/software_features.png?raw=True" width="600px"/></div>
 
 ## User Document
 
