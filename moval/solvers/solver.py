@@ -377,13 +377,13 @@ class Solver(abc.ABC):
 
                 self.model.param_ext = optimized_param
 
-            self.model.eval()
-            self.model.is_fitted = True
-
-            return self.model.param, self.model.param_ext
+        # I need save the normalization parameter, if the confidence needs to be normalized.
+        _ = self.model.calibrate(self.inp)
 
         self.model.eval()
         self.model.is_fitted = True
 
-        return self.model.param
-
+        if self.model.extend_param:
+            return self.model.param, self.model.param_ext
+        else:
+            return self.model.param
