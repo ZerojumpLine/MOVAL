@@ -138,7 +138,7 @@ def test_seg_3d(estim_algorithm, mode, metric, confidence_scores, class_specific
         DSC_list.append(DSC)
     m_DSC = np.mean(np.array(DSC_list))
     
-    err_val_dsc = np.abs( m_DSC - estim_dsc )
+    err_val_dsc = np.abs( m_DSC - estim_dsc[1] )
 
     # save the test err in the result files.
 
@@ -153,7 +153,7 @@ def test_seg_3d(estim_algorithm, mode, metric, confidence_scores, class_specific
         DSC_list_test.append(DSC)
     m_DSC_test = np.mean(np.array(DSC_list_test))
 
-    err_test = np.abs( m_DSC_test - estim_dsc_test )
+    err_test = np.abs( m_DSC_test - estim_dsc_test[1] )
 
     test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
 

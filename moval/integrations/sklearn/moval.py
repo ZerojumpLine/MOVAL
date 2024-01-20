@@ -551,8 +551,7 @@ class MOVAL(BaseEstimator):
                 If ``False``, it means that there isn't any manuel label of class d in this sample.
         
         Returns:
-            estim: estimated average sensitivity (float) for classification tasks, 
-                or estimated sensitivity of shape ``(d-1, )`` for segmentation tasks.
+            estim: estimated sensitivity of shape ``(d, )``.
         
         Example:
 
@@ -562,7 +561,7 @@ class MOVAL(BaseEstimator):
             >>> gt = np.random.randint(0, 10, (1000))
             >>> moval_model = moval.MOVAL()
             >>> moval_model.fit(logits, gt)
-            >>> estim_acc = moval_model.estimate_sensitivity(logits)
+            >>> estim_sensitivity = moval_model.estimate_sensitivity(logits)
 
         """
 
@@ -586,10 +585,7 @@ class MOVAL(BaseEstimator):
         else:
             estim_sensitivity = self.model_.estimate_sensitivity(logits, probability, gt_guide = gt_guide)
 
-        if self.mode == "classification":
-            return np.mean(estim_sensitivity)
-        else:
-            return estim_sensitivity[1:]
+        return estim_sensitivity
     
     def estimate_precision(self,
                  logits: Union[List[Iterable], np.ndarray],
@@ -613,7 +609,7 @@ class MOVAL(BaseEstimator):
             >>> gt = np.random.randint(0, 10, (1000))
             >>> moval_model = moval.MOVAL()
             >>> moval_model.fit(logits, gt)
-            >>> estim_acc = moval_model.estimate_precision(logits)
+            >>> estim_precision = moval_model.estimate_precision(logits)
 
         """
 
@@ -637,10 +633,7 @@ class MOVAL(BaseEstimator):
         else:
             estim_precision = self.model_.estimate_precision(probability, gt_guide = gt_guide)
 
-        if self.mode == "classification":
-            return np.mean(estim_precision)
-        else:
-            return estim_precision[1:]
+        return estim_precision
     
     def estimate_f1score(self,
                  logits: Union[List[Iterable], np.ndarray],
@@ -664,7 +657,7 @@ class MOVAL(BaseEstimator):
             >>> gt = np.random.randint(0, 10, (1000))
             >>> moval_model = moval.MOVAL()
             >>> moval_model.fit(logits, gt)
-            >>> estim_acc = moval_model.estimate_f1score(logits)
+            >>> estim_f1score = moval_model.estimate_f1score(logits)
                 
         """
 
@@ -688,10 +681,7 @@ class MOVAL(BaseEstimator):
         else:
             estim_f1score = self.model_.estimate_f1score(logits, probability, gt_guide = gt_guide)
 
-        if self.mode == "classification":
-            return np.mean(estim_f1score)
-        else:
-            return estim_f1score[1:]
+        return estim_f1score
 
     def estimate_auc(self,
                  logits: Union[List[Iterable], np.ndarray],
@@ -715,7 +705,7 @@ class MOVAL(BaseEstimator):
             >>> gt = np.random.randint(0, 10, (1000))
             >>> moval_model = moval.MOVAL()
             >>> moval_model.fit(logits, gt)
-            >>> estim_acc = moval_model.estimate_auc(logits)
+            >>> estim_auc = moval_model.estimate_auc(logits)
                 
         """
 
@@ -739,10 +729,7 @@ class MOVAL(BaseEstimator):
         else:
             estim_auc = self.model_.estimate_auc(probability, gt_guide = gt_guide)
 
-        if self.mode == "classification":
-            return np.mean(estim_auc)
-        else:
-            return estim_auc[1:]
+        return estim_auc
     
     def save(self, filename: str):
         """Save current parameters to disk using pickle.

@@ -151,7 +151,7 @@ def test_seg_3d(estim_algorithm, mode, metric, confidence_scores, class_specific
             ValueError(f"Not implemented real metric calculation of {metric}")
     m_metric = np.mean(np.array(metric_list))
     
-    err_val = np.abs( m_metric - estim_metric )
+    err_val = np.abs( m_metric - estim_metric[1] )
 
     # save the test err in the result files.
 
@@ -174,7 +174,7 @@ def test_seg_3d(estim_algorithm, mode, metric, confidence_scores, class_specific
 
     m_metric_test = np.mean(np.array(metric_list_test))
 
-    err_test = np.abs( m_metric_test - estim_test )
+    err_test = np.abs( m_metric_test - estim_test[1] )
 
     test_condition = f"estim_algorithm = {estim_algorithm}, mode = {mode}, metric = {metric}, confidence_scores = {confidence_scores}, class_specific = {class_specific}"
 
