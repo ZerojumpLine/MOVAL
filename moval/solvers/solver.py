@@ -134,7 +134,7 @@ class Solver(abc.ABC):
             exclusive_background: If ``False``, we exclude the background class (the most majority class).
         
         Return:
-            kcls_list: a list of class index. The first element should correspond to the most majority class.
+            kcls_list: a list of class index. The first element should correspond to the most minority class.
 
         """
         numclass = self.model.num_class
@@ -245,8 +245,6 @@ class Solver(abc.ABC):
         kcls_list = self.kcls_order_list(self.inp, exclusive_background)
 
         if self.class_specific:
-            if self.metric != "precision" and self.metric != "auc":
-                kcls_list = kcls_list[::-1]
             for kcls in kcls_list:
                 self.kcls = kcls
                 optimization_result = scipy.optimize.minimize(
@@ -312,8 +310,6 @@ class Solver(abc.ABC):
         if self.model.extend_param:
 
             if self.class_specific:
-                if self.metric != "precision" and self.metric != "auc":
-                    kcls_list = kcls_list[::-1]
                 for kcls in kcls_list:
                     self.kcls = kcls
                     optimization_result = scipy.optimize.minimize(
