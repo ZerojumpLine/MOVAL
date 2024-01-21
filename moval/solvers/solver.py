@@ -71,13 +71,13 @@ class Solver(abc.ABC):
                 probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
                 estim_perf = self.model.estimate_sensitivity(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "precision":
-                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
+                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True, full=True)
                 estim_perf = self.model.estimate_precision(probability, gt_guide = self.gt_guide)
             elif self.metric == "f1score":
                 probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
                 estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "auc":
-                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
+                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True, full=True)
                 estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide)
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")
@@ -110,13 +110,13 @@ class Solver(abc.ABC):
                 probability = self.model.calculate_probability(self.inp, appr=True)
                 estim_perf = self.model.estimate_sensitivity(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "precision":
-                probability = self.model.calculate_probability(self.inp, appr=True)
+                probability = self.model.calculate_probability(self.inp, appr=True, full=True)
                 estim_perf = self.model.estimate_precision(probability, gt_guide = self.gt_guide)
             elif self.metric == "f1score":
                 probability = self.model.calculate_probability(self.inp, appr=True)
                 estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "auc":
-                probability = self.model.calculate_probability(self.inp, appr=True)
+                probability = self.model.calculate_probability(self.inp, appr=True, full=True)
                 estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide)
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")
@@ -243,6 +243,8 @@ class Solver(abc.ABC):
 
         # generate a list of length kcls, from high to low
         kcls_list = self.kcls_order_list(self.inp, exclusive_background)
+        if self.metric == "f1score":
+            kcls_list = kcls_list[::-1]
 
         if self.class_specific:
             for kcls in kcls_list:

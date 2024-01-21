@@ -430,7 +430,7 @@ class Model(abc.ABC):
         
         raise NotImplementedError()
     
-    def calculate_probability(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, appr: bool = False) -> Union[List[Iterable], np.ndarray]:
+    def calculate_probability(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, appr: bool = False, full: bool = False) -> Union[List[Iterable], np.ndarray]:
         """Calculate the calibrated probability with parameters.
         For classificaiton tasks, we choose to estimate the pseudo-temperature, for segmentation tasks, we simplify it with 1-socre.
 
@@ -438,6 +438,7 @@ class Model(abc.ABC):
             inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
             midstage: If ``True``, return the first calibrated results.
             appr: If ``True``, utilize the approximation version.
+            full: If ``False``, we just put the score in and fill the other domains with 0.
 
         Returns:
             calibrated_probability: The calibrated probability which would match the accuracy/DSC on validation data, of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
@@ -445,13 +446,13 @@ class Model(abc.ABC):
         """
 
         if self.mode == "segmentation" or appr:
-            return self.calculate_probability_appr(inp, midstage)
+            return self.calculate_probability_appr(inp, midstage, full)
         elif self.mode == "classification":
-            return self.calculate_probability_temperature(inp, midstage)
+            return self.calculate_probability_temperature(inp, midstage, full)
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
 
-    def calculate_probability_temperature(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> Union[List[Iterable], np.ndarray]:
+    def calculate_probability_temperature(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, full : bool = False) -> Union[List[Iterable], np.ndarray]:
         """Calculate the calibrated probability with parameters, based on temperature scaling.
         The challenge is the calculation of non-maximum probability. 
         To achieve this, we calculate the pseudo-temperature for each samples such that the confidence score match the max probability after the temperature scaling process.
@@ -468,6 +469,7 @@ class Model(abc.ABC):
         Args:
             inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
             midstage: If ``True``, return the first calibrated results.
+            full: If ``False``, we just put the score in and fill the other domains with 0.
 
         Returns:
             calibrated_probability: The calibrated probability which would match the accuracy/DSC on validation data, of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
@@ -481,7 +483,7 @@ class Model(abc.ABC):
             
         if self.mode == "classification":
             # extend from ``(n, )`` to ``(n, d)``
-            if self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
+            if not full or self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
                 # ATC cannot get the calibrated probability of all classes, we just fill the other dimension with zeros
                 pred_flatten = np.argmax(inp, axis = 1)
                 probability = np.zeros((score.shape + (self.num_class,))) # ``(n, d)``
@@ -495,7 +497,7 @@ class Model(abc.ABC):
 
         elif self.mode == "segmentation":
             # extend from a list of n ``(H, W, (D))`` to a list of n ``(d, H, W, (D))``
-            if self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
+            if not full or self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
                 # ATC cannot get the calibrated probability of all classes, we just fill the other dimension with zeros
                 probability = []
                 for n_case in range(len(inp)):
@@ -530,7 +532,7 @@ class Model(abc.ABC):
         
         return probability
     
-    def calculate_probability_appr(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False) -> Union[List[Iterable], np.ndarray]:
+    def calculate_probability_appr(self, inp: Union[List[Iterable], np.ndarray], midstage: bool = False, full : bool = False) -> Union[List[Iterable], np.ndarray]:
         """Calculate the calibrated probability with parameters, utilizing approximation of 1-score.
         To acclerate the optimization process, we calculate the probability but divide 1-score equally to other classes.
         I should use it for all the segmentation tasks, as the pixel number is always quite large.
@@ -542,6 +544,7 @@ class Model(abc.ABC):
         Args:
             inp: The network output (logits) of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
             midstage: If ``True``, return the first calibrated results.
+            full: If ``False``, we just put the score in and fill the other domains with 0.
 
         Returns:
             calibrated_probability: The calibrated probability which would match the accuracy/DSC on validation data, of shape ``(n, d)`` or a list of n ``(d, H, W, (D))``.
@@ -557,7 +560,7 @@ class Model(abc.ABC):
             # extend from ``(n, )`` to ``(n, d)``
             pred_flatten = np.argmax(inp, axis = 1)
             probability = np.zeros((score.shape + (self.num_class,))) # ``(n, d)``
-            if self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
+            if not full or self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
                 # ATC cannot get the calibrated probability of all classes, we just fill the other dimension with zeros
                 pass
             else:
@@ -578,7 +581,7 @@ class Model(abc.ABC):
                 score_case = score[n_case] # ``(H, W, (D))``
                 score_flatten = score[n_case].flatten() # ``n``
                 probability_case = np.zeros((score_flatten.shape + (self.num_class,))) # ``(n, d)``
-                if self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
+                if not full or self.estim_algorithm == "atc-model" or (self.estim_algorithm == "ts-atc-model" and midstage == False):
                     # ATC cannot get the calibrated probability of all classes, we just fill the other dimension with zeros
                     pass
                 else:

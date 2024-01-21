@@ -186,7 +186,10 @@ class MOVAL(BaseEstimator):
 
                 solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
                 solver.fit(logits, gt) # model fitting
-                probability_cond = model.calculate_probability(logits, appr = True) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
+                if self.metric == "precision" or self.metric == "auc":
+                    probability_cond = model.calculate_probability(logits, appr = True, full = True) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
+                else:
+                    probability_cond = model.calculate_probability(logits, appr = True) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
                 #
                 models.append(model)
                 solvers.append(solver)
@@ -226,13 +229,12 @@ class MOVAL(BaseEstimator):
 
             solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
             solver.fit(logits, gt) # model fitting
-            probability = model.calculate_probability(logits, appr = True)
 
             # save the results to self attributes.
             self.model_ = model
             self.solver_ = solver
             print(f"Calculating and saving the fitted case-wise performance...")
-            self.fitted_perf = self.get_case_perf(model, self.metric, logits, probability, gt)
+            self.fitted_perf = self.get_case_perf(model, self.metric, logits, gt)
 
         if self.mode == "classification":
             self.n_dim_ = len(logits.shape)
@@ -273,7 +275,6 @@ class MOVAL(BaseEstimator):
                       model: moval.models,
                       metric: str,
                       inp: Union[List[Iterable], np.ndarray],
-                      probability: Union[List[Iterable], np.ndarray],
                       gt: Union[List[Iterable], np.ndarray]):
         """Store the estimated results of n fitted data.
 
@@ -284,7 +285,6 @@ class MOVAL(BaseEstimator):
             model: The fitted moval model.
             metric: The performance metric to follow.
             inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
-            probability: The predicted probability of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
             gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation.
 
         Returns:
@@ -294,26 +294,35 @@ class MOVAL(BaseEstimator):
 
         fitted_perf = []
         
+        if metric == "precision" or metric == "auc":
+            probability = model.calculate_probability(inp, appr = True, full=True)
+        else:
+            probability = model.calculate_probability(inp, appr = True)
+
         if model.mode == "classification":
 
             if metric == "accuracy":
-                for n_case in range(len(probability)):
+                for n_case in range(len(inp)):
                     estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1])
                     fitted_perf.append(estim_perf_case)
             elif metric == "sensitivity":
-                estim_perf_case = model.estimate_sensitivity(inp, probability)
-                fitted_perf.append(np.mean(estim_perf_case))
+                for n_case in range(len(probability)):
+                    estim_perf_case = model.estimate_sensitivity(inp, probability)
+                    fitted_perf.append(estim_perf_case)
             elif metric == "precision":
-                estim_perf_case = model.estimate_precision(probability)
-                fitted_perf.append(np.mean(estim_perf_case))
+                for n_case in range(len(probability)):
+                    estim_perf_case = model.estimate_precision(inp, probability)
+                    fitted_perf.append(estim_perf_case)
             elif metric == "f1score":
-                estim_perf_case = model.estimate_f1score(inp, probability)
-                fitted_perf.append(np.mean(estim_perf_case))
+                for n_case in range(len(probability)):
+                    estim_perf_case = model.estimate_f1score(inp, probability)
+                    fitted_perf.append(estim_perf_case)
             elif metric == "auc":
-                estim_perf_case = model.estimate_auc(probability)
-                fitted_perf.append(np.mean(estim_perf_case))
+                for n_case in range(len(probability)):
+                    estim_perf_case = model.estimate_auc(inp, probability)
+                    fitted_perf.append(estim_perf_case)
             else:
-                ValueError(f"Unsupported metric '{metric}'")      
+                ValueError(f"Unsupported metric '{metric}'") 
         
         else:
 
@@ -327,7 +336,7 @@ class MOVAL(BaseEstimator):
                 gt_guide.append(gt_exist)
             gt_guide = np.array(gt_guide)
 
-            for n_case in range(len(probability)):
+            for n_case in range(len(inp)):
                 
                 if metric == "accuracy":
                     estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], gt_guide = gt_guide)
@@ -472,13 +481,19 @@ class MOVAL(BaseEstimator):
         if self.ensemble:
             probabilities = []
             for model in self.model_:
-                probability_cond = model.calculate_probability(logits, appr = True)
+                if self.metric == "precision" or self.metric == "auc":
+                    probability_cond = model.calculate_probability(logits, appr = True, full=True)
+                else:
+                    probability_cond = model.calculate_probability(logits, appr = True)
 
                 probabilities.append(probability_cond)
             probability = self.probability_aggregation(probabilities)
         else:
             model = self.model_
-            probability = model.calculate_probability(logits, appr = True)
+            if self.metric == "precision" or self.metric == "auc":
+                probability = model.calculate_probability(logits, appr = True, full=True)
+            else:
+                probability = model.calculate_probability(logits, appr = True)
 
         return probability
 
