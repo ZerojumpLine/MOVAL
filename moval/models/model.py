@@ -193,7 +193,11 @@ class Model(abc.ABC):
             estim_acc_allcls = []
             for kcls in range(inp.shape[1]):
                 score_kcls = score[np.where(pred == kcls)[0]]
-                estim_acc_kcls = np.mean(score_kcls)
+                if len(score_kcls) > 0:
+                    estim_acc_kcls = np.mean(score_kcls)
+                else:
+                    # does not pred any
+                    estim_acc_kcls = 1e-5
                 estim_acc_allcls.append(estim_acc_kcls)
             return estim_acc, np.array(estim_acc_allcls)
         elif self.mode == "segmentation":

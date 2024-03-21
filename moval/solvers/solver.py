@@ -247,37 +247,48 @@ class Solver(abc.ABC):
             kcls_list = kcls_list[::-1]
 
         if self.class_specific:
+            pred = np.argmax(inp, axis = 1)
+
             for kcls in kcls_list:
                 self.kcls = kcls
-                optimization_result = scipy.optimize.minimize(
-                                fun = self.eval_func,
-                                x0 = x0,
-                                method = optimization_method,
-                                bounds = [(1e-06,None)],
-                                tol = 1e-07)
-                
-                optimized_param = optimization_result.x[0]
 
-                if optimization_result.fun > search_threshold:
-                    # change the initial state, if we are not satisfied with the optimization results.
-                    print(f"Not satisfied with initial optimization results of param for class {kcls}, trying more initial states...")
-                    results = []
-                    results.append((optimization_result.fun, optimization_result.x[0]))
-                    cnt_guess = 0
-                    for initial_guess in initial_conditions:
-                        optimization_result = scipy.optimize.minimize(
-                                fun = self.eval_func,
-                                x0 = initial_guess,
-                                method = optimization_method,
-                                bounds = [(1e-06,None)],
-                                tol = 1e-07)
-                        results.append((optimization_result.fun, optimization_result.x[0]))
-                        cnt_guess += 1
-                        print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
+                # skip the class-wise optimization process, if 
+                # a) there isn't any corresponding predictions, as it is not possible for alignment, metric = 0.
+                # b) there isn't any corresponding GT, as the alignment would has not much meaning.
+                gt_pos_cls = np.where(gt == kcls)[0]
+                pred_pos_cls = np.where(pred == kcls)[0]
+
+                if len(gt_pos_cls) > 0 and len(pred_pos_cls) > 0:
+
+                    optimization_result = scipy.optimize.minimize(
+                                    fun = self.eval_func,
+                                    x0 = x0,
+                                    method = optimization_method,
+                                    bounds = [(1e-06,None)],
+                                    tol = 1e-07)
                     
-                    optimized_param = min(results, key=lambda x: x[0])[1]
+                    optimized_param = optimization_result.x[0]
 
-                self.model.param[kcls] = optimized_param
+                    if optimization_result.fun > search_threshold:
+                        # change the initial state, if we are not satisfied with the optimization results.
+                        print(f"Not satisfied with initial optimization results of param for class {kcls}, trying more initial states...")
+                        results = []
+                        results.append((optimization_result.fun, optimization_result.x[0]))
+                        cnt_guess = 0
+                        for initial_guess in initial_conditions:
+                            optimization_result = scipy.optimize.minimize(
+                                    fun = self.eval_func,
+                                    x0 = initial_guess,
+                                    method = optimization_method,
+                                    bounds = [(1e-06,None)],
+                                    tol = 1e-07)
+                            results.append((optimization_result.fun, optimization_result.x[0]))
+                            cnt_guess += 1
+                            print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
+                        
+                        optimized_param = min(results, key=lambda x: x[0])[1]
+
+                    self.model.param[kcls] = optimized_param
         else:
             optimization_result = scipy.optimize.minimize(
                             fun = self.eval_func,
@@ -314,33 +325,42 @@ class Solver(abc.ABC):
             if self.class_specific:
                 for kcls in kcls_list:
                     self.kcls = kcls
-                    optimization_result = scipy.optimize.minimize(
-                                    fun = self.eval_func_ext,
-                                    x0 = x0,
-                                    method = optimization_method,
-                                    bounds = [(1e-03,None)],
-                                    tol = 1e-07)
-                    
-                    optimized_param = optimization_result.x[0]
 
-                    if optimization_result.fun > search_threshold:
-                        # change the initial state, if we are not satisfied with the optimization results.
-                        print(f"Not satisfied with initial optimization results of param for class {kcls}, trying more initial states...")
-                        results = []
-                        results.append((optimization_result.fun, optimization_result.x[0]))
-                        cnt_guess = 0
-                        for initial_guess in initial_conditions_atc:
-                            optimization_result = scipy.optimize.minimize(
-                                    fun = self.eval_func_ext,
-                                    x0 = initial_guess,
-                                    method = optimization_method,
-                                    bounds = [(1e-03,None)],
-                                    tol = 1e-07)
-                            results.append((optimization_result.fun, optimization_result.x[0]))
-                            cnt_guess += 1
-                            print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
+                    # skip the class-wise optimization process, if 
+                    # a) there isn't any corresponding predictions, as it is not possible for alignment, metric = 0.
+                    # b) there isn't any corresponding GT, as the alignment would has not much meaning.
+                    gt_pos_cls = np.where(gt == kcls)[0]
+                    pred_pos_cls = np.where(pred == kcls)[0]
+
+                    if len(gt_pos_cls) > 0 and len(pred_pos_cls) > 0:
+
+                        optimization_result = scipy.optimize.minimize(
+                                        fun = self.eval_func_ext,
+                                        x0 = x0,
+                                        method = optimization_method,
+                                        bounds = [(1e-03,None)],
+                                        tol = 1e-07)
                         
-                        optimized_param = min(results, key=lambda x: x[0])[1]
+                        optimized_param = optimization_result.x[0]
+
+                        if optimization_result.fun > search_threshold:
+                            # change the initial state, if we are not satisfied with the optimization results.
+                            print(f"Not satisfied with initial optimization results of param for class {kcls}, trying more initial states...")
+                            results = []
+                            results.append((optimization_result.fun, optimization_result.x[0]))
+                            cnt_guess = 0
+                            for initial_guess in initial_conditions_atc:
+                                optimization_result = scipy.optimize.minimize(
+                                        fun = self.eval_func_ext,
+                                        x0 = initial_guess,
+                                        method = optimization_method,
+                                        bounds = [(1e-03,None)],
+                                        tol = 1e-07)
+                                results.append((optimization_result.fun, optimization_result.x[0]))
+                                cnt_guess += 1
+                                print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
+                            
+                            optimized_param = min(results, key=lambda x: x[0])[1]
 
                     self.model.param_ext[kcls] = optimized_param
 

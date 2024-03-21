@@ -120,7 +120,7 @@ if os.path.isfile(results_files):
                                moval.models.get_conf_options(),
                                [False, True])),
 )
-def test_seg_3d(estim_algorithm, mode, metric, confidence_scores, class_specific):
+def test_seg_2d(estim_algorithm, mode, metric, confidence_scores, class_specific):
 
     moval_model = moval.MOVAL(
                 mode = mode,

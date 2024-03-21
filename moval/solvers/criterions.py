@@ -63,68 +63,46 @@ class clsCalibrate(Calibrate):
 
             if self.metric == "accuracy":
                 for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(pred == kcls)[0]
-                    # if there do not exist any samplies for class kcls
-                    if len(pos_cls) == 0:
-                        acc_cls = np.sum(gt == pred) / len(gt)
-                    else:
-                        acc_cls = np.sum(gt[pos_cls] == pred[pos_cls]) / len(gt[pos_cls])
+                    pos_cls = np.where(gt == kcls)[0]
+                    acc_cls = np.sum(gt[pos_cls] == pred[pos_cls]) / len(gt[pos_cls])
+
                     err[kcls] = estim[kcls] - acc_cls
 
             elif self.metric == "sensitivity":
                 sensitivities = []
                 for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(gt == kcls)[0]
-                    # if there do not exist any samplies for class kcls
-                    if len(pos_cls) == 0:
-                        sensitivity_cls = -1
-                    else:
-                        _, sensitivity_cls, _ = ComputMetric(gt == kcls, pred == kcls)
+                    _, sensitivity_cls, _ = ComputMetric(gt == kcls, pred == kcls)
                     sensitivities.append(sensitivity_cls)
                 sensitivities = np.array(sensitivities)
-                sensitivity_mean = sensitivities[sensitivities >= 0].mean()
-                sensitivities[sensitivities < 0] = sensitivity_mean
+                sensitivity_mean = sensitivities.mean()
 
-                err = estim - sensitivities
+                err = estim - sensitivity_mean
 
             elif self.metric == "precision":
                 precisions = []
                 for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(gt == kcls)[0]
-                    # if there do not exist any samplies for class kcls
-                    if len(pos_cls) == 0:
-                        precision_cls = -1
-                    else:
-                        _, _, precision_cls = ComputMetric(gt == kcls, pred == kcls)
+                    _, _, precision_cls = ComputMetric(gt == kcls, pred == kcls)
                     precisions.append(precision_cls)
                 precisions = np.array(precisions)
-                precision_mean = precisions[precisions >= 0].mean()
-                precisions[precisions < 0] = precision_mean
+                precision_mean = precisions.mean()
 
-                err = estim - precisions
+                err = estim - precision_mean
 
             elif self.metric == "f1score":
                 f1scores = []
                 for kcls in range(inp.shape[1]):
-                    pos_cls = np.where(gt == kcls)[0]
-                    # if there do not exist any samplies for class kcls
-                    if len(pos_cls) == 0:
-                        f1score_cls = -1
-                    else:
-                        f1score_cls, _, _ = ComputMetric(gt == kcls, pred == kcls)
+                    f1score_cls, _, _ = ComputMetric(gt == kcls, pred == kcls)
                     f1scores.append(f1score_cls)
                 f1scores = np.array(f1scores)
-                f1score_mean = f1scores[f1scores >= 0].mean()
-                f1scores[f1scores < 0] = f1score_mean
+                f1score_mean = f1scores.mean()
 
-                err = estim - f1scores
+                err = estim - f1score_mean
 
             elif self.metric == "auc":
                 aucs = ComputAUC(gt, cal_softmax(inp))
-                auc_mean = aucs[aucs > 0].mean()
-                aucs[aucs == 0] = auc_mean
+                auc_mean = aucs.mean()
 
-                err = estim - aucs
+                err = estim - auc_mean
 
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")

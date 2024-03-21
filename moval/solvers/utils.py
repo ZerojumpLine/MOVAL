@@ -64,11 +64,8 @@ def ComputAUC(ACTUAL: np.ndarray, PROBABILITY: np.ndarray) -> float:
     fpr, tpr, roc_auc = dict(), dict(), dict()
     for i in range(PROBABILITY.shape[1]):
         
-        if np.sum(y_onehot_test[:, i]) == 0: # no positive samples
-            roc_auc[i] = -1
-        else:
-            fpr[i], tpr[i], _ = roc_curve(y_onehot_test[:, i], PROBABILITY[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
+        fpr[i], tpr[i], _ = roc_curve(y_onehot_test[:, i], PROBABILITY[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
 
     return np.array(list(roc_auc.values()))
 

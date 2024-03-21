@@ -171,8 +171,9 @@ class MOVAL(BaseEstimator):
                     class_specific = class_specific
                 )
 
-                if class_specific == True and self.metric != "accuracy" and self.metric != "sensitivity":
+                if class_specific == True:
                     # find a good initatlization, as other metrics would also depend on non-maximum logits
+                    # also find a good init for accuary of sensitivty, to handle the corner cases, where making no prediction for specific classes.
                     model_pre = moval.models.init(
                         estim_algorithm,
                         mode = self.mode,
@@ -214,8 +215,9 @@ class MOVAL(BaseEstimator):
                 class_specific = self.class_specific
                 )
             
-            if self.class_specific == True and self.metric != "accuracy" and self.metric != "sensitivity":
+            if self.class_specific == True:
                 # find a good initatlization, as other metrics would also depend on non-maximum logits
+                # also find a good init for accuary of sensitivty, to handle the corner cases, where making no prediction for specific classes.
                 model_pre = moval.models.init(
                     self.estim_algorithm,
                     mode = self.mode,
