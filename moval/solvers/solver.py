@@ -82,8 +82,8 @@ class Solver(abc.ABC):
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")
 
-            err = self.criterions(self.inp, self.gt, estim_perf)
-            err = np.mean(err)
+            err_cls = self.criterions(self.inp, self.gt, estim_perf)
+            err = err_cls[self.kcls]
 
         return err
 

@@ -63,8 +63,9 @@ class clsCalibrate(Calibrate):
 
             if self.metric == "accuracy":
                 for kcls in range(inp.shape[1]):
+                    e1 = 1e-6 # small number to avoid nan.
                     pos_cls = np.where(pred == kcls)[0]
-                    acc_cls = np.sum(gt[pos_cls] == pred[pos_cls]) / len(gt[pos_cls])
+                    acc_cls = np.sum(gt[pos_cls] == pred[pos_cls]) / (len(gt[pos_cls]) + e1)
 
                     err[kcls] = estim[kcls] - acc_cls
 
