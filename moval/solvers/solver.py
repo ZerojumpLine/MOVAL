@@ -206,7 +206,7 @@ class Solver(abc.ABC):
         # some hyper parameters.
         optimization_method = 'Nelder-Mead'
         x0 = np.array([1.0])
-        search_threshold = 0.01 # if the optimized results are larger than this, we go through the initial conditions
+        search_threshold = 1e-3 # if the optimized results are larger than this, we go through the initial conditions
         exclusive_background = False
 
         if self.model.mode == "classification":
@@ -373,7 +373,7 @@ class Solver(abc.ABC):
 
                         if optimization_result.fun > search_threshold:
                             # change the initial state, if we are not satisfied with the optimization results.
-                            print(f"Not satisfied with initial optimization results of param for class {kcls}, trying more initial states...")
+                            print(f"Not satisfied with initial optimization results of param_ext for class {kcls}, trying more initial states...")
                             results = []
                             results.append((optimization_result.fun, optimization_result.x[0]))
                             cnt_guess = 0
