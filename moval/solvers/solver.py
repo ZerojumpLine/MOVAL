@@ -210,10 +210,10 @@ class Solver(abc.ABC):
         exclusive_background = False
 
         if self.model.mode == "classification":
-            initial_conditions_atc = [np.array([0.01]), np.array([0.1]), np.array([0.3]), np.array([0.5]), np.array([0.9])]
+            initial_conditions_atc = [np.array([0.001]), np.array([0.01]), np.array([0.1]), np.array([0.5]), np.array([0.9])]
             if self.model.estim_algorithm == "atc-model":
                 # the range of atc estimation is [0, 1].
-                initial_conditions = [np.array([0.01]), np.array([0.1]), np.array([0.3]), np.array([0.5]), np.array([0.9])]
+                initial_conditions = [np.array([0.001]), np.array([0.01]), np.array([0.1]), np.array([0.5]), np.array([0.9])]
             elif self.model.estim_algorithm == "doc-model":
                 # the range of doc estimation is [0, 2].
                 initial_conditions = [np.array([0.01]), np.array([0.1]), np.array([0.5]), np.array([1.5]), np.array([1.8])]
