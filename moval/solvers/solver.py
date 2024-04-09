@@ -206,14 +206,13 @@ class Solver(abc.ABC):
         # some hyper parameters.
         optimization_method = 'Nelder-Mead'
         x0 = np.array([1.0])
-        search_threshold = 1e-3 # if the optimized results are larger than this, we go through the initial conditions
+        search_threshold = 0.01 # if the optimized results are larger than this, we go through the initial conditions
         exclusive_background = False
 
         if self.model.mode == "classification":
-            initial_conditions_atc = [np.array([0.001]), np.array([0.01]), np.array([0.1]), np.array([0.5]), np.array([0.9])]
             if self.model.estim_algorithm == "atc-model":
                 # the range of atc estimation is [0, 1].
-                initial_conditions = [np.array([0.001]), np.array([0.01]), np.array([0.1]), np.array([0.5]), np.array([0.9])]
+                initial_conditions = [np.array([0.01]), np.array([0.1]), np.array([0.3]), np.array([0.5]), np.array([0.9])]
             elif self.model.estim_algorithm == "doc-model":
                 # the range of doc estimation is [0, 2].
                 initial_conditions = [np.array([0.01]), np.array([0.1]), np.array([0.5]), np.array([1.5]), np.array([1.8])]
@@ -223,7 +222,6 @@ class Solver(abc.ABC):
             print(f"Opitimizing with {inp.shape[0]} samples...")
             
         else:
-            initial_conditions_atc = [np.array([0.01]), np.array([0.5])]
             if self.model.estim_algorithm == "atc-model":
                 # the range of atc estimation is [0, 1].
                 initial_conditions = [np.array([0.01]), np.array([0.5])]
@@ -374,6 +372,25 @@ class Solver(abc.ABC):
                         if optimization_result.fun > search_threshold:
                             # change the initial state, if we are not satisfied with the optimization results.
                             print(f"Not satisfied with initial optimization results of param_ext for class {kcls}, trying more initial states...")
+                            # change atc to be consistent with the range of confidence score
+                            # get the max and min value here.
+                            score = self.model.calibrate(inp, midstage = True)
+                            if self.model.mode == "classification":
+                                score_ = score[np.argmax(inp, axis = 1) == kcls]
+                                initial_conditions_atc = [np.array([np.percentile(score_, 20)]), 
+                                                            np.array([np.percentile(score_, 40)]), 
+                                                            np.array([np.percentile(score_, 50)]), 
+                                                            np.array([np.percentile(score_, 60)]), 
+                                                            np.array([np.percentile(score_, 80)])]
+                            else:
+                                score_ = []
+                                for n_case in range(len(inp)):
+                                    score_flatten = score[n_case].flatten() # ``n``
+                                    pred_flatten = np.argmax(inp[n_case], axis = 0).flatten()
+                                    score_.append(score_flatten[pred_flatten == kcls])
+                                score_ = np.concatenate(score_)
+                                initial_conditions_atc = [np.array([np.percentile(score_, 20)]), 
+                                                            np.array([np.percentile(score_, 50)])]
                             results = []
                             results.append((optimization_result.fun, optimization_result.x[0]))
                             cnt_guess = 0
@@ -388,6 +405,7 @@ class Solver(abc.ABC):
                                 cnt_guess += 1
                                 print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
                             
+                            print(results)
                             optimized_param = min(results, key=lambda x: x[0])[1]
 
                     self.model.param_ext[kcls] = optimized_param
@@ -405,6 +423,26 @@ class Solver(abc.ABC):
                 if optimization_result.fun > search_threshold:
                     # change the initial state, if we are not satisfied with the optimization results.
                     print(f"Not satisfied with initial optimization results of param_ext, trying more initial states...")
+                    # change atc to be consistent with the range of confidence score
+                    # get the max and min value here.
+                    score = self.model.calibrate(inp, midstage = True)
+                    if self.model.mode == "classification":
+                        score_ = score[np.argmax(inp, axis = 1)]
+                        score_ = np.concatenate(score_)
+                        initial_conditions_atc = [np.array([np.percentile(score_, 20)]), 
+                                                    np.array([np.percentile(score_, 40)]), 
+                                                    np.array([np.percentile(score_, 50)]), 
+                                                    np.array([np.percentile(score_, 60)]), 
+                                                    np.array([np.percentile(score_, 80)])]
+                    else:
+                        score_ = []
+                        for n_case in range(len(inp)):
+                            score_flatten = score[n_case].flatten() # ``n``
+                            pred_flatten = np.argmax(inp[n_case], axis = 0).flatten()
+                            score_.append(score_flatten[pred_flatten])
+                        score_ = np.concatenate(score_)
+                        initial_conditions_atc = [np.array([np.percentile(score_, 20)]), 
+                                                    np.array([np.percentile(score_, 50)])]
                     results = []
                     results.append((optimization_result.fun, optimization_result.x))
                     cnt_guess = 0

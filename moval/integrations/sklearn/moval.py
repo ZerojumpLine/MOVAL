@@ -290,7 +290,7 @@ class MOVAL(BaseEstimator):
             gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation.
 
         Returns:
-            fitted_perf: a list contain estimated results of shape of len n.
+            fitted_perf: a list contain estimated results of shape of len n. Each element is a scalar if estimated accuracy, otherwise ``(d, )``.
         
         """
 
@@ -302,29 +302,23 @@ class MOVAL(BaseEstimator):
             probability = model.calculate_probability(inp, appr = True)
 
         if model.mode == "classification":
+            
+            for n_case in range(len(inp)):
 
-            if metric == "accuracy":
-                for n_case in range(len(inp)):
+                if metric == "accuracy":
                     estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1])
-                    fitted_perf.append(estim_perf_case)
-            elif metric == "sensitivity":
-                for n_case in range(len(probability)):
-                    estim_perf_case = model.estimate_sensitivity(inp, probability)
-                    fitted_perf.append(estim_perf_case)
-            elif metric == "precision":
-                for n_case in range(len(probability)):
-                    estim_perf_case = model.estimate_precision(inp, probability)
-                    fitted_perf.append(estim_perf_case)
-            elif metric == "f1score":
-                for n_case in range(len(probability)):
-                    estim_perf_case = model.estimate_f1score(inp, probability)
-                    fitted_perf.append(estim_perf_case)
-            elif metric == "auc":
-                for n_case in range(len(probability)):
-                    estim_perf_case = model.estimate_auc(inp, probability)
-                    fitted_perf.append(estim_perf_case)
-            else:
-                ValueError(f"Unsupported metric '{metric}'") 
+                elif metric == "sensitivity":
+                    estim_perf_case = model.estimate_sensitivity(inp[n_case:n_case + 1], probability[n_case:n_case + 1])
+                elif metric == "precision":
+                    estim_perf_case = model.estimate_precision(probability[n_case:n_case + 1])
+                elif metric == "f1score":
+                    estim_perf_case = model.estimate_f1score(inp[n_case:n_case + 1], probability[n_case:n_case + 1])
+                elif metric == "auc":
+                    estim_perf_case = model.estimate_auc(probability[n_case:n_case + 1])
+                else:
+                    ValueError(f"Unsupported metric '{metric}'") 
+                
+                fitted_perf.append(estim_perf_case)
         
         else:
 
@@ -341,22 +335,19 @@ class MOVAL(BaseEstimator):
             for n_case in range(len(inp)):
                 
                 if metric == "accuracy":
-                    estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], gt_guide = gt_guide)
+                    estim_perf_case, _ = model.estimate_accuracy(inp[n_case:n_case + 1], gt_guide = gt_guide[n_case:n_case + 1])
                 elif metric == "sensitivity":
-                    estim_perf_case = model.estimate_sensitivity(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+                    estim_perf_case = model.estimate_sensitivity(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide[n_case:n_case + 1])
                 elif metric == "precision":
-                    estim_perf_case = model.estimate_precision(probability[n_case:n_case + 1], gt_guide = gt_guide)
+                    estim_perf_case = model.estimate_precision(probability[n_case:n_case + 1], gt_guide = gt_guide[n_case:n_case + 1])
                 elif metric == "f1score":
-                    estim_perf_case = model.estimate_f1score(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide)
+                    estim_perf_case = model.estimate_f1score(inp[n_case:n_case + 1], probability[n_case:n_case + 1], gt_guide = gt_guide[n_case:n_case + 1])
                 elif metric == "auc":
-                    estim_perf_case = model.estimate_auc(probability[n_case:n_case + 1], gt_guide = gt_guide)
+                    estim_perf_case = model.estimate_auc(probability[n_case:n_case + 1], gt_guide = gt_guide[n_case:n_case + 1])
                 else:
                     ValueError(f"Unsupported metric '{metric}'")
                 
-                if metric == "accuracy":
-                    fitted_perf.append(estim_perf_case)
-                else:
-                    fitted_perf.append(np.mean(estim_perf_case[1:]))
+                fitted_perf.append(estim_perf_case)
         
         return fitted_perf
 
