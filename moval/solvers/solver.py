@@ -245,24 +245,42 @@ class Solver(abc.ABC):
             kcls_list = kcls_list[::-1]
 
         if self.class_specific:
-            pred = np.argmax(inp, axis = 1)
+            
+            if self.model.mode == "classification":
+                pred = np.argmax(inp, axis = 1)
+            else:
+                preds = []
+                for n_case in range(len(inp)):
+                    preds.append(np.argmax(inp[n_case], axis = 0))
 
             for kcls in kcls_list:
                 self.kcls = kcls
 
-                # skip the class-wise optimization process, if 
-                # a) there isn't any corresponding predictions, as it is not possible for alignment, metric = 0.
-                # b) there isn't any corresponding GT, as the alignment would has not much meaning.
-                gt_pos_cls = np.where(gt == kcls)[0]
-                pred_pos_cls = np.where(pred == kcls)[0]
+                # do the class-wise optimization process, if 
+                # a) there is any corresponding predictions, as it is possible for alignment, metric = 0.
+                # and
+                # b) there is any corresponding GT, as the alignment would has some meaning.
+                flag_case_a = False
+                flag_case_b = False
+                if self.model.mode == "classification":
+                    if np.sum(pred == kcls) > 0:
+                        flag_case_a = True
+                    if np.sum(gt == kcls) > 0:
+                        flag_case_b = True
+                else:
+                    for n_case in range(len(inp)):
+                        if np.sum(preds[n_case] == kcls) > 0:
+                            flag_case_a = True
+                        if np.sum(gt[n_case] == kcls) > 0:
+                            flag_case_b = True
 
-                if len(gt_pos_cls) > 0 and len(pred_pos_cls) > 0:
+                if flag_case_a and flag_case_b:
 
                     optimization_result = scipy.optimize.minimize(
                                     fun = self.eval_func,
                                     x0 = x0,
                                     method = optimization_method,
-                                    bounds = [(1e-03,None)],
+                                    bounds = [(1e-06,None)],
                                     tol = 1e-07)
                     
                     optimized_param = optimization_result.x[0]
@@ -278,7 +296,7 @@ class Solver(abc.ABC):
                                     fun = self.eval_func,
                                     x0 = initial_guess,
                                     method = optimization_method,
-                                    bounds = [(1e-03,None)],
+                                    bounds = [(1e-06,None)],
                                     tol = 1e-07)
                             results.append((optimization_result.fun, optimization_result.x[0]))
                             cnt_guess += 1
@@ -292,7 +310,7 @@ class Solver(abc.ABC):
                             fun = self.eval_func,
                             x0 = x0,
                             method = optimization_method,
-                            bounds = [(1e-03,None)],
+                            bounds = [(1e-06,None)],
                             tol = 1e-07)
         
             optimized_param = optimization_result.x
@@ -308,7 +326,7 @@ class Solver(abc.ABC):
                             fun = self.eval_func,
                             x0 = initial_guess,
                             method = optimization_method,
-                            bounds = [(1e-03,None)],
+                            bounds = [(1e-06,None)],
                             tol = 1e-07)
                     results.append((optimization_result.fun, optimization_result.x))
                     cnt_guess += 1
@@ -324,13 +342,25 @@ class Solver(abc.ABC):
                 for kcls in kcls_list:
                     self.kcls = kcls
 
-                    # skip the class-wise optimization process, if 
-                    # a) there isn't any corresponding predictions, as it is not possible for alignment, metric = 0.
-                    # b) there isn't any corresponding GT, as the alignment would has not much meaning.
-                    gt_pos_cls = np.where(gt == kcls)[0]
-                    pred_pos_cls = np.where(pred == kcls)[0]
+                    # do the class-wise optimization process, if 
+                    # a) there is any corresponding predictions, as it is possible for alignment, metric = 0.
+                    # and
+                    # b) there is any corresponding GT, as the alignment would has some meaning.
+                    flag_case_a = False
+                    flag_case_b = False
+                    if self.model.mode == "classification":
+                        if np.sum(pred == kcls) > 0:
+                            flag_case_a = True
+                        if np.sum(gt == kcls) > 0:
+                            flag_case_b = True
+                    else:
+                        for n_case in range(len(inp)):
+                            if np.sum(preds[n_case] == kcls) > 0:
+                                flag_case_a = True
+                            if np.sum(gt[n_case] == kcls) > 0:
+                                flag_case_b = True
 
-                    if len(gt_pos_cls) > 0 and len(pred_pos_cls) > 0:
+                    if flag_case_a and flag_case_b:
 
                         optimization_result = scipy.optimize.minimize(
                                         fun = self.eval_func_ext,
