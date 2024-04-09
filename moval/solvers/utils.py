@@ -35,7 +35,7 @@ def ComputMetric(ACTUAL: np.ndarray, PREDICTED: np.ndarray) -> float:
     return dice, sensitivity, precision
 
 # AUC calculation here.
-def ComputAUC(ACTUAL: np.ndarray, PROBABILITY: np.ndarray) -> float:
+def ComputAUC(ACTUAL: np.ndarray, PROBABILITY: np.ndarray, sel_cls: int = None) -> float:
     """Calculate the AUC.
 
     Note:
@@ -44,11 +44,12 @@ def ComputAUC(ACTUAL: np.ndarray, PROBABILITY: np.ndarray) -> float:
         It is not used in the framework of MOVAL, but could be useful to validate moval's performance.
 
     Args:
-        PROBABILITY: The predicted probability of shape ``(d, H, W, (D))`` or predicted classification results of shape ``(n, d)``.
         ACTUAL: The ground truth segmentation map of shape ``(H, W, (D))`` or predicted classification results of shape ``(n, )``.
+        PROBABILITY: The predicted probability of shape ``(d, H, W, (D))`` or predicted classification results of shape ``(n, d)``.
+        sel_cls: The selected class for calculation. If it is None, return all classes.
     
     Returns:
-        AUCs: The calculate class-wise AUC of shape ``(d, )``.
+        AUCs: The calculate class-wise AUC of shape ``(d, )``, or ``(1, )`` if sel_cls is givien.
     
     """
 
@@ -62,7 +63,13 @@ def ComputAUC(ACTUAL: np.ndarray, PROBABILITY: np.ndarray) -> float:
 
     y_onehot_test = one_hot_embedding(ACTUAL, PROBABILITY.shape[1])
     fpr, tpr, roc_auc = dict(), dict(), dict()
-    for i in range(PROBABILITY.shape[1]):
+
+    if sel_cls is None:
+        allcls = range(PROBABILITY.shape[1])
+    else:
+        allcls = range(sel_cls, sel_cls+1)
+
+    for i in allcls:
         
         fpr[i], tpr[i], _ = roc_curve(y_onehot_test[:, i], PROBABILITY[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])

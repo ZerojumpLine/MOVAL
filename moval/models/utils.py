@@ -214,7 +214,7 @@ def SoftPrecision(x: np.ndarray, y: np.ndarray, smooth = 1e-5) -> np.ndarray:
 
     return precision
 
-def SoftAUC(x: np.ndarray) -> np.ndarray:
+def SoftAUC(x: np.ndarray, sel_cls: int = None) -> np.ndarray:
     """Calculate the estimated AUC given the probability.
     
     Note:
@@ -224,11 +224,12 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
     
     Args:
         x: The predicted probability of shape ``(n, d, (H), (W), (D))``.
+        sel_cls: Selected class to calculate AUC.
 
     Returns:
-        AUCs: Estimated class-wise AUC of shape ``(d, )``.
-        TPRall: A list of d true positive rates for different classes.
-        FPRall: A list of d false positive rates for different classes.
+        AUCs: Estimated class-wise AUC of shape ``(d, )``, or ``(1, )`` if sel_cls is givien.
+        TPRall: A list of d true positive rates for different classes, or a list of 1 if sel_cls is givien.
+        FPRall: A list of d false positive rates for different classes, or a list of 1 if sel_cls is givien.
 
     """
     
@@ -246,7 +247,13 @@ def SoftAUC(x: np.ndarray) -> np.ndarray:
     TPRall = []
     FPRall = []
     smooth = 1e-6
-    for test_cls in range(x.shape[1]):
+    #
+    if sel_cls is None:
+        allcls = range(x.shape[1])
+    else:
+        allcls = range(sel_cls, sel_cls+1)
+
+    for test_cls in allcls:
         # low thres -> high FPR -> high sensitivity (TPR)
         # obtain TPRs and FPRs
 

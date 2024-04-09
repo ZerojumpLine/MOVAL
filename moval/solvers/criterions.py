@@ -34,7 +34,8 @@ class clsCalibrate(Calibrate):
         self,
         inp: np.ndarray,
         gt: np.ndarray,
-        estim: np.ndarray
+        estim: np.ndarray,
+        kcls: int
     ) -> np.ndarray:
         """Compute the calibration err for classification tasks.
         
@@ -43,10 +44,11 @@ class clsCalibrate(Calibrate):
             gt: The cooresponding annotation of shape ``(n, )``.
             estim: The estimated performance by moval.
                 For class-specific version, estim is of shape ``(d, )`` which contains differences for different classes. 
+            kcls: This is only for the class-specific verision, which indicates the class to be optimized.
         
         Returns:
             err: The difference between the estimated accuracy and the real accuracy.
-                For class-specific version, err is of shape ``(d, )`` which contains differences for different classes.
+                For class-specific version, err contains differences for class kcls.
         
         """
 
@@ -62,48 +64,31 @@ class clsCalibrate(Calibrate):
             err = np.zeros(inp.shape[1])
 
             if self.metric == "accuracy":
-                for kcls in range(inp.shape[1]):
-                    e1 = 1e-6 # small number to avoid nan.
-                    pos_cls = np.where(pred == kcls)[0]
-                    acc_cls = np.sum(gt[pos_cls] == pred[pos_cls]) / (len(gt[pos_cls]) + e1)
+                e1 = 1e-6 # small number to avoid nan.
+                pos_cls = np.where(pred == kcls)[0]
+                acc_cls = np.sum(gt[pos_cls] == pred[pos_cls]) / (len(gt[pos_cls]) + e1)
 
-                    err[kcls] = estim[kcls] - acc_cls
+                err = estim[kcls] - acc_cls
 
             elif self.metric == "sensitivity":
-                sensitivities = []
-                for kcls in range(inp.shape[1]):
-                    _, sensitivity_cls, _ = ComputMetric(gt == kcls, pred == kcls)
-                    sensitivities.append(sensitivity_cls)
-                sensitivities = np.array(sensitivities)
-                sensitivity_mean = sensitivities.mean()
+                _, sensitivity_cls, _ = ComputMetric(gt == kcls, pred == kcls)
 
-                err = estim - sensitivity_mean
+                err = estim[kcls] - sensitivity_cls
 
             elif self.metric == "precision":
-                precisions = []
-                for kcls in range(inp.shape[1]):
-                    _, _, precision_cls = ComputMetric(gt == kcls, pred == kcls)
-                    precisions.append(precision_cls)
-                precisions = np.array(precisions)
-                precision_mean = precisions.mean()
+                _, _, precision_cls = ComputMetric(gt == kcls, pred == kcls)
 
-                err = estim - precision_mean
+                err = estim[kcls] - precision_cls
 
             elif self.metric == "f1score":
-                f1scores = []
-                for kcls in range(inp.shape[1]):
-                    f1score_cls, _, _ = ComputMetric(gt == kcls, pred == kcls)
-                    f1scores.append(f1score_cls)
-                f1scores = np.array(f1scores)
-                f1score_mean = f1scores.mean()
+                f1score_cls, _, _ = ComputMetric(gt == kcls, pred == kcls)
 
-                err = estim - f1score_mean
+                err = estim[kcls] - f1score_cls
 
             elif self.metric == "auc":
-                aucs = ComputAUC(gt, cal_softmax(inp))
-                auc_mean = aucs.mean()
+                aucs = ComputAUC(gt, cal_softmax(inp), kcls)
 
-                err = estim - auc_mean
+                err = estim[0] - aucs[0]
 
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")
@@ -121,7 +106,8 @@ class segCalibrate(Calibrate):
         self,
         inp: List[Iterable],
         gt: List[Iterable],
-        estim: np.ndarray
+        estim: np.ndarray,
+        kcls: int
     ) -> np.ndarray:
         """Compute the calibration err for segmentation tasks.
         
@@ -130,10 +116,11 @@ class segCalibrate(Calibrate):
             gt: The cooresponding annotation as a list of n ``(H, W, (D))`` for segmentation. 
             estim: The estimated performance by moval.
                 For class-specific version, estim is of shape ``(d, )`` which contains differences for different classes. 
+            kcls: This is only for the class-specific verision, which indicates the class to be optimized.
         
         Returns:
             err: The difference between the estimated metric and the real metric.
-                For class-specific version, err is of shape ``(d, )`` which contains differences for different classes.
+                For class-specific version, err contains differences for class kcls.
 
         """
 
@@ -161,24 +148,23 @@ class segCalibrate(Calibrate):
             if self.metric == "accuracy":
                 
                 err = np.zeros(inp[0].shape[0])
-                for kcls in range(0, inp[0].shape[0]):
                     
-                    pred_all_flatten_kcls = []
-                    gt_all_flatten_kcls = []
+                pred_all_flatten_kcls = []
+                gt_all_flatten_kcls = []
 
-                    for n_case in range(len(inp)):
+                for n_case in range(len(inp)):
 
-                        pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
-                        gt_case     = gt[n_case] # ``(H, W, (D))``
-                        pos_kcls = np.where(pred_case.flatten() == kcls)[0]
-                        pred_all_flatten_kcls.append(pred_case.flatten()[pos_kcls])
-                        gt_all_flatten_kcls.append(gt_case.flatten()[pos_kcls])
-                    
-                    pred_all_flatten_kcls = np.concatenate(pred_all_flatten_kcls, axis=0)
-                    gt_all_flatten_kcls = np.concatenate(gt_all_flatten_kcls, axis=0)
+                    pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
+                    gt_case     = gt[n_case] # ``(H, W, (D))``
+                    pos_kcls = np.where(pred_case.flatten() == kcls)[0]
+                    pred_all_flatten_kcls.append(pred_case.flatten()[pos_kcls])
+                    gt_all_flatten_kcls.append(gt_case.flatten()[pos_kcls])
+                
+                pred_all_flatten_kcls = np.concatenate(pred_all_flatten_kcls, axis=0)
+                gt_all_flatten_kcls = np.concatenate(gt_all_flatten_kcls, axis=0)
 
-                    acc_cls = np.sum(gt_all_flatten_kcls == pred_all_flatten_kcls) / len(gt_all_flatten_kcls)
-                    err[kcls] = estim[kcls] - acc_cls
+                acc_cls = np.sum(gt_all_flatten_kcls == pred_all_flatten_kcls) / len(gt_all_flatten_kcls)
+                err = estim[kcls] - acc_cls
                 
             elif self.metric == "sensitivity":
 
@@ -188,24 +174,19 @@ class segCalibrate(Calibrate):
                     pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                     gt_case     = gt[n_case] # ``(H, W, (D))``
 
-                    sensitivity_case = np.zeros(inp[n_case].shape[0])
-                    for kcls in range(1, inp[n_case].shape[0]):
-                        if np.sum(gt_case == kcls) == 0:
-                            sensitivity_case[kcls] = -1
-                        else:
-                            _, sensitivity_case[kcls], _ = ComputMetric(gt_case == kcls, pred_case == kcls)
-                    sensitivity.append(sensitivity_case)
+                    if np.sum(gt_case == kcls) == 0:
+                        sensitivity_cls = -1
+                    else:
+                        _, sensitivity_cls, _ = ComputMetric(gt_case == kcls, pred_case == kcls)
+                    sensitivity.append(sensitivity_cls)
                 
                 # only aggregate the ones which are not -1
-                sensitivity = np.array(sensitivity) # ``(n, d)``
-                sensitivity_mean = []
-                for kcls in range(inp[n_case].shape[0]):
-                    # I am not sure, if the real sensitivity is 0, I think the network cannot learn anything
-                    # but any calculate this case in the estim, may we can improve here.
-                    sensitivity_mean.append(sensitivity[:, kcls][sensitivity[:,kcls] >= 0].mean())
-                sensitivity_mean = np.array(sensitivity_mean)
+                sensitivity = np.array(sensitivity) # ``(n, )``
+                # I am not sure, if the real sensitivity is 0, I think the network cannot learn anything
+                # but any calculate this case in the estim, may we can improve here.
+                sensitivity_mean = sensitivity[sensitivity >= 0].mean()
 
-                err = estim - sensitivity_mean
+                err = estim[kcls] - sensitivity_mean
 
             elif self.metric == "precision":
 
@@ -215,24 +196,19 @@ class segCalibrate(Calibrate):
                     pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                     gt_case     = gt[n_case] # ``(H, W, (D))``
 
-                    precision_case = np.zeros(inp[n_case].shape[0])
-                    for kcls in range(1, inp[n_case].shape[0]):
-                        if np.sum(gt_case == kcls) == 0:
-                            precision_case[kcls] = -1
-                        else:
-                            _, _, precision_case[kcls] = ComputMetric(gt_case == kcls, pred_case == kcls)
-                    precision.append(precision_case)
+                    if np.sum(gt_case == kcls) == 0:
+                        precision_cls = -1
+                    else:
+                        _, _, precision_cls = ComputMetric(gt_case == kcls, pred_case == kcls)
+                    precision.append(precision_cls)
                 
                 # only aggregate the ones which are not -1
                 precision = np.array(precision) # ``(n, d)``
-                precision_mean = []
-                for kcls in range(inp[n_case].shape[0]):
-                    # I am not sure, if the real precision is 0, I think the network cannot learn anything
-                    # but any calculate this case in the estim, may we can improve here.
-                    precision_mean.append(precision[:, kcls][precision[:,kcls] >= 0].mean())
-                precision_mean = np.array(precision_mean)
+                # I am not sure, if the real precision is 0, I think the network cannot learn anything
+                # but any calculate this case in the estim, may we can improve here.
+                precision_mean = precision[precision >= 0].mean()
 
-                err = estim - precision_mean
+                err = estim[kcls] - precision_mean
 
             elif self.metric == "f1score":
 
@@ -242,24 +218,19 @@ class segCalibrate(Calibrate):
                     pred_case   = np.argmax(inp[n_case], axis = 0) # ``(H, W, (D))``
                     gt_case     = gt[n_case] # ``(H, W, (D))``
 
-                    dsc_case = np.zeros(inp[n_case].shape[0])
-                    for kcls in range(1, inp[n_case].shape[0]):
-                        if np.sum(gt_case == kcls) == 0:
-                            dsc_case[kcls] = -1
-                        else:
-                            dsc_case[kcls], _, _ = ComputMetric(gt_case == kcls, pred_case == kcls)
-                    dsc.append(dsc_case)
+                    if np.sum(gt_case == kcls) == 0:
+                        dsc_cls = -1
+                    else:
+                        dsc_cls, _, _ = ComputMetric(gt_case == kcls, pred_case == kcls)
+                    dsc.append(dsc_cls)
                 
                 # only aggregate the ones which are not -1
                 dsc = np.array(dsc) # ``(n, d)``
-                dsc_mean = []
-                for kcls in range(inp[n_case].shape[0]):
-                    # I am not sure, if the real dsc is 0, I think the network cannot learn anything
-                    # but any calculate this case in the estim, may we can improve here.
-                    dsc_mean.append(dsc[:, kcls][dsc[:,kcls] >= 0].mean())
-                dsc_mean = np.array(dsc_mean)
+                # I am not sure, if the real dsc is 0, I think the network cannot learn anything
+                # but any calculate this case in the estim, may we can improve here.
+                dsc_mean = dsc[dsc >= 0].mean()
 
-                err = estim - dsc_mean
+                err = estim[kcls] - dsc_mean
 
             elif self.metric == "auc":
                 
@@ -275,19 +246,16 @@ class segCalibrate(Calibrate):
                     probability = cal_softmax(inp_case) # ``(n, d)``                    
                     gt_case     = gt[n_case].flatten() # ``(n, )``
 
-                    auc_case = ComputAUC(gt_case, probability) # ``(d, )``
+                    auc_case = ComputAUC(gt_case, probability, kcls) # ``(1, )``
                     auc.append(auc_case)
                 
                 # only aggregate the ones which are not -1
-                auc = np.array(auc) # ``(n, d)``
-                auc_mean = []
-                for kcls in range(inp[n_case].shape[0]):
-                    # I am not sure, if the real dsc is 0, I think the network cannot learn anything
-                    # but any calculate this case in the estim, may we can improve here.
-                    auc_mean.append(auc[:, kcls][auc[:,kcls] >= 0].mean())
-                auc_mean = np.array(auc_mean)
+                auc = np.array(auc) # ``(n, 1)``
+                # I am not sure, if the real dsc is 0, I think the network cannot learn anything
+                # but any calculate this case in the estim, may we can improve here.
+                auc_mean = auc[:, 0][auc[:, 0] >= 0].mean()
 
-                err = estim - auc_mean
+                err = estim[0] - auc_mean
 
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")

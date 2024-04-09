@@ -375,7 +375,10 @@ class Model(abc.ABC):
         else:
             raise ValueError(f"Unknown mode '{self.mode}'")
     
-    def estimate_auc(self, probability: Union[List[Iterable], np.ndarray], gt_guide: np.ndarray = None) -> Tuple[float, np.ndarray]:
+    def estimate_auc(self, 
+                     probability: Union[List[Iterable], np.ndarray], 
+                     gt_guide: np.ndarray = None, 
+                     sel_cls: int = None) -> Tuple[float, np.ndarray]:
         """Esimate the AUC using network output.
 
         Args:
@@ -384,9 +387,10 @@ class Model(abc.ABC):
                 We will utilize this to determine if there is label in the case. If not, we do not calculate the dsc and utilize for optimizing.
                 This is because we do not want to optimize parameter with blank segmentation map. 
                 This should be bool, if ``False``, it means that there isn't any manuel label of class d in this sample.
+            sel_cls: The selected class for calculation. If it is None, return all classes.
         
         Returns:
-            estim_AUC: Estimated class-wise AUC of shape ``(d, )``.
+            estim_AUC: Estimated class-wise AUC of shape ``(d, )``, or ``(1, )`` if sel_cls is givien.
 
         """
 
@@ -396,7 +400,7 @@ class Model(abc.ABC):
         # Estimate the sensitivity.
         if self.mode == "classification":
             # probability is of shape ``(n, d)``
-            estim_AUC, _, _ = SoftAUC(probability)
+            estim_AUC, _, _ = SoftAUC(probability, sel_cls = sel_cls)
             return estim_AUC
         elif self.mode == "segmentation":
             # probability is a list of n ``(d, H, W, (D))``.
@@ -404,7 +408,7 @@ class Model(abc.ABC):
             for n_case in range(len(probability)):
                 score_filled = probability[n_case] # ``(d, H, W, (D))``
                 #
-                estim_AUC, _, _ = SoftAUC(score_filled[np.newaxis, ...])
+                estim_AUC, _, _ = SoftAUC(score_filled[np.newaxis, ...], sel_cls = sel_cls)
                 #
                 if isinstance(gt_guide, np.ndarray):
                     gt_case = gt_guide[n_case]

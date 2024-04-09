@@ -78,12 +78,11 @@ class Solver(abc.ABC):
                 estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "auc":
                 probability = self.model.calculate_probability(self.inp, midstage = True, appr=True, full=True)
-                estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide)
+                estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide, sel_cls = self.kcls)
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")
 
-            err_cls = self.criterions(self.inp, self.gt, estim_perf)
-            err = err_cls[self.kcls]
+            err = self.criterions(self.inp, self.gt, estim_perf, self.kcls)
 
         return err
 
@@ -117,12 +116,11 @@ class Solver(abc.ABC):
                 estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
             elif self.metric == "auc":
                 probability = self.model.calculate_probability(self.inp, appr=True, full=True)
-                estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide)
+                estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide, sel_cls = self.kcls)
             else:
                 ValueError(f"Unsupported metric '{self.metric}'")
 
-            err_cls = self.criterions(self.inp, self.gt, estim_perf)
-            err = err_cls[self.kcls]
+            err = self.criterions(self.inp, self.gt, estim_perf, self.kcls)
 
         return err
 
@@ -264,7 +262,7 @@ class Solver(abc.ABC):
                                     fun = self.eval_func,
                                     x0 = x0,
                                     method = optimization_method,
-                                    bounds = [(1e-06,None)],
+                                    bounds = [(1e-03,None)],
                                     tol = 1e-07)
                     
                     optimized_param = optimization_result.x[0]
@@ -280,7 +278,7 @@ class Solver(abc.ABC):
                                     fun = self.eval_func,
                                     x0 = initial_guess,
                                     method = optimization_method,
-                                    bounds = [(1e-06,None)],
+                                    bounds = [(1e-03,None)],
                                     tol = 1e-07)
                             results.append((optimization_result.fun, optimization_result.x[0]))
                             cnt_guess += 1
@@ -294,7 +292,7 @@ class Solver(abc.ABC):
                             fun = self.eval_func,
                             x0 = x0,
                             method = optimization_method,
-                            bounds = [(1e-06,None)],
+                            bounds = [(1e-03,None)],
                             tol = 1e-07)
         
             optimized_param = optimization_result.x
@@ -310,7 +308,7 @@ class Solver(abc.ABC):
                             fun = self.eval_func,
                             x0 = initial_guess,
                             method = optimization_method,
-                            bounds = [(1e-06,None)],
+                            bounds = [(1e-03,None)],
                             tol = 1e-07)
                     results.append((optimization_result.fun, optimization_result.x))
                     cnt_guess += 1
