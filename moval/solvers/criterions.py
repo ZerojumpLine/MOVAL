@@ -35,7 +35,7 @@ class clsCalibrate(Calibrate):
         inp: np.ndarray,
         gt: np.ndarray,
         estim: np.ndarray,
-        kcls: int
+        kcls: int = None
     ) -> np.ndarray:
         """Compute the calibration err for classification tasks.
         
@@ -107,7 +107,7 @@ class segCalibrate(Calibrate):
         inp: List[Iterable],
         gt: List[Iterable],
         estim: np.ndarray,
-        kcls: int
+        kcls: int = None
     ) -> np.ndarray:
         """Compute the calibration err for segmentation tasks.
         
