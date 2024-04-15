@@ -2,6 +2,7 @@ import dataclasses as dataclasses
 import abc
 from typing import Callable, Iterable, List, Literal, Optional, Tuple, Union
 import numpy as np
+import math
 import scipy
 import moval.models
 import moval.solvers
@@ -60,29 +61,39 @@ class Solver(abc.ABC):
                 estim_acc, _ = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
             err = self.criterions(self.inp, self.gt, estim_acc)
         else:
-            self.model.param[self.kcls] = x
-            
-            if self.metric == "accuracy":
-                if self.model.extend_param:
-                    _, estim_perf = self.model.estimate_accuracy(self.inp, midstage = True, gt_guide = self.gt_guide)
-                else:
-                    _, estim_perf = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
-            elif self.metric == "sensitivity":
-                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
-                estim_perf = self.model.estimate_sensitivity(self.inp, probability, gt_guide = self.gt_guide)
-            elif self.metric == "precision":
-                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True, full=True)
-                estim_perf = self.model.estimate_precision(probability, gt_guide = self.gt_guide)
-            elif self.metric == "f1score":
-                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
-                estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
-            elif self.metric == "auc":
-                probability = self.model.calculate_probability(self.inp, midstage = True, appr=True, full=True)
-                estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide, sel_cls = self.kcls)
-            else:
-                ValueError(f"Unsupported metric '{self.metric}'")
+            estim_perf_all = []
+            kcls_all = []
+            for kcls in range(self.batch * self.opt_kcls, np.min((self.batch * (self.opt_kcls + 1), self.model.num_class))):
 
-            err = self.criterions(self.inp, self.gt, estim_perf, self.kcls)
+                self.model.param[kcls] = x
+                
+                if self.metric == "accuracy":
+                    if self.model.extend_param:
+                        _, estim_perf = self.model.estimate_accuracy(self.inp, midstage = True, gt_guide = self.gt_guide)
+                    else:
+                        _, estim_perf = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
+                    estim_perf_all.append(estim_perf[kcls])
+                elif self.metric == "sensitivity":
+                    probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
+                    estim_perf = self.model.estimate_sensitivity(self.inp, probability, gt_guide = self.gt_guide)
+                    estim_perf_all.append(estim_perf[kcls])
+                elif self.metric == "precision":
+                    probability = self.model.calculate_probability(self.inp, midstage = True, appr=True, full=True)
+                    estim_perf = self.model.estimate_precision(probability, gt_guide = self.gt_guide)
+                    estim_perf_all.append(estim_perf[kcls])
+                elif self.metric == "f1score":
+                    probability = self.model.calculate_probability(self.inp, midstage = True, appr=True)
+                    estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
+                    estim_perf_all.append(estim_perf[kcls])
+                elif self.metric == "auc":
+                    probability = self.model.calculate_probability(self.inp, midstage = True, appr=True, full=True)
+                    estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide, sel_cls = kcls)
+                    estim_perf_all.append(estim_perf[0])
+                else:
+                    ValueError(f"Unsupported metric '{self.metric}'")
+                kcls_all.append(kcls)
+
+            err = self.criterions(self.inp, self.gt, estim_perf_all, kcls_all)
 
         return err
 
@@ -101,26 +112,35 @@ class Solver(abc.ABC):
             estim_acc, _ = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
             err = self.criterions(self.inp, self.gt, estim_acc)
         else:
-            self.model.param_ext[self.kcls] = x
+            estim_perf_all = []
+            kcls_all = []
+            for kcls in range(self.batch * self.opt_kcls, np.min((self.batch * (self.opt_kcls + 1), self.model.num_class))):
+                self.model.param_ext[kcls] = x
 
-            if self.metric == "accuracy":
-                _, estim_perf = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
-            elif self.metric == "sensitivity":
-                probability = self.model.calculate_probability(self.inp, appr=True)
-                estim_perf = self.model.estimate_sensitivity(self.inp, probability, gt_guide = self.gt_guide)
-            elif self.metric == "precision":
-                probability = self.model.calculate_probability(self.inp, appr=True, full=True)
-                estim_perf = self.model.estimate_precision(probability, gt_guide = self.gt_guide)
-            elif self.metric == "f1score":
-                probability = self.model.calculate_probability(self.inp, appr=True)
-                estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
-            elif self.metric == "auc":
-                probability = self.model.calculate_probability(self.inp, appr=True, full=True)
-                estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide, sel_cls = self.kcls)
-            else:
-                ValueError(f"Unsupported metric '{self.metric}'")
+                if self.metric == "accuracy":
+                    _, estim_perf = self.model.estimate_accuracy(self.inp, gt_guide = self.gt_guide)
+                    estim_perf_all.append(estim_perf[kcls])
+                elif self.metric == "sensitivity":
+                    probability = self.model.calculate_probability(self.inp, appr=True)
+                    estim_perf = self.model.estimate_sensitivity(self.inp, probability, gt_guide = self.gt_guide)
+                    estim_perf_all.append(estim_perf[kcls])
+                elif self.metric == "precision":
+                    probability = self.model.calculate_probability(self.inp, appr=True, full=True)
+                    estim_perf = self.model.estimate_precision(probability, gt_guide = self.gt_guide)
+                    estim_perf_all.append(estim_perf[kcls])
+                elif self.metric == "f1score":
+                    probability = self.model.calculate_probability(self.inp, appr=True)
+                    estim_perf = self.model.estimate_f1score(self.inp, probability, gt_guide = self.gt_guide)
+                    estim_perf_all.append(estim_perf[kcls])
+                elif self.metric == "auc":
+                    probability = self.model.calculate_probability(self.inp, appr=True, full=True)
+                    estim_perf = self.model.estimate_auc(probability, gt_guide = self.gt_guide, sel_cls = self.kcls)
+                    estim_perf_all.append(estim_perf[0])
+                else:
+                    ValueError(f"Unsupported metric '{self.metric}'")
+                kcls_all.append(kcls)
 
-            err = self.criterions(self.inp, self.gt, estim_perf, self.kcls)
+            err = self.criterions(self.inp, self.gt, estim_perf_all, kcls_all)
 
         return err
 
@@ -135,14 +155,14 @@ class Solver(abc.ABC):
             kcls_list: a list of class index. The first element should correspond to the most minority class.
 
         """
-        numclass = self.model.num_class
-        kcls_sample = np.zeros(numclass)
+        kcls_sample = np.zeros(self.opt_class)
         if self.model.mode == "classification":
             pred = np.argmax(inp, axis = 1)
-            for kcls in range(numclass):
-                kcls_sample[kcls] = kcls_sample[kcls] + np.sum(pred == kcls)
+            for opt_kcls in range(self.opt_class):
+                for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
+                    kcls_sample[opt_kcls] = kcls_sample[opt_kcls] + np.sum(pred == kcls)
         else:
-            for kcls in range(numclass):
+            for kcls in range(self.model.num_class):
                 for n_case in range(len(inp)):
                     pred_case = np.argmax(inp[n_case], axis = 0)
                     kcls_sample[kcls] = kcls_sample[kcls] + np.sum(pred_case == kcls)
@@ -156,14 +176,19 @@ class Solver(abc.ABC):
     def fit(
         self,
         inp: Union[List[Iterable], np.ndarray],
-        gt: Union[List[Iterable], np.ndarray]
+        gt: Union[List[Iterable], np.ndarray],
+        batch: int = 1
     ) -> Union[Tuple[np.ndarray, np.ndarray], np.ndarray]:
         """Fit the model based on scipy backend.
         
         Args:
             inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
-            gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation. 
+            gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation.
+            batch: To match the group-wise accuracy with group-wise confidence score. batch is the group size. This is useful when validation data per case is few.
         
+        Note:
+            ``batch`` is only used for class-specific variants. It does NOT support segmentation tasks as it is always unnecessary.
+            
         Return:
             param: The optimized parameters, of shape ``(d, )`` or a float.
             If the model contains extended parameters, will return Tuple[param, param_ext].
@@ -187,6 +212,8 @@ class Solver(abc.ABC):
 
         self.inp = inp
         self.gt = gt
+        self.batch = batch
+        self.opt_class = math.ceil(self.model.num_class / batch)
         # generate gt_guide from gt here.
         if self.model.mode == "segmentation":
             gt_guide = []
@@ -251,8 +278,8 @@ class Solver(abc.ABC):
                 for n_case in range(len(inp)):
                     preds.append(np.argmax(inp[n_case], axis = 0))
 
-            for kcls in kcls_list:
-                self.kcls = kcls
+            for opt_kcls in kcls_list:
+                self.opt_kcls = opt_kcls
 
                 # do the class-wise optimization process, if 
                 # a) there is any corresponding predictions, as it is possible for alignment, metric = 0.
@@ -261,15 +288,16 @@ class Solver(abc.ABC):
                 flag_case_a = False
                 flag_case_b = False
                 if self.model.mode == "classification":
-                    if np.sum(pred == kcls) > 0:
-                        flag_case_a = True
-                    if np.sum(gt == kcls) > 0:
-                        flag_case_b = True
+                    for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
+                        if np.sum(pred == kcls) > 0:
+                            flag_case_a = True
+                        if np.sum(gt == kcls) > 0:
+                            flag_case_b = True
                 else:
                     for n_case in range(len(inp)):
-                        if np.sum(preds[n_case] == kcls) > 0:
+                        if np.sum(preds[n_case] == opt_kcls) > 0:
                             flag_case_a = True
-                        if np.sum(gt[n_case] == kcls) > 0:
+                        if np.sum(gt[n_case] == opt_kcls) > 0:
                             flag_case_b = True
 
                 if flag_case_a and flag_case_b:
@@ -285,7 +313,7 @@ class Solver(abc.ABC):
 
                     if optimization_result.fun > search_threshold:
                         # change the initial state, if we are not satisfied with the optimization results.
-                        print(f"Not satisfied with initial optimization results of param for class {kcls}, trying more initial states...")
+                        print(f"Not satisfied with initial optimization results of param for class {opt_kcls}, trying more initial states...")
                         results = []
                         results.append((optimization_result.fun, optimization_result.x[0]))
                         cnt_guess = 0
@@ -302,7 +330,8 @@ class Solver(abc.ABC):
                         
                         optimized_param = min(results, key=lambda x: x[0])[1]
 
-                    self.model.param[kcls] = optimized_param
+                    for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
+                        self.model.param[kcls] = optimized_param
         else:
             optimization_result = scipy.optimize.minimize(
                             fun = self.eval_func,
@@ -337,8 +366,8 @@ class Solver(abc.ABC):
         if self.model.extend_param:
 
             if self.class_specific:
-                for kcls in kcls_list:
-                    self.kcls = kcls
+                for opt_kcls in kcls_list:
+                    self.opt_kcls = opt_kcls
 
                     # do the class-wise optimization process, if 
                     # a) there is any corresponding predictions, as it is possible for alignment, metric = 0.
@@ -347,15 +376,16 @@ class Solver(abc.ABC):
                     flag_case_a = False
                     flag_case_b = False
                     if self.model.mode == "classification":
-                        if np.sum(pred == kcls) > 0:
-                            flag_case_a = True
-                        if np.sum(gt == kcls) > 0:
-                            flag_case_b = True
+                        for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
+                            if np.sum(pred == kcls) > 0:
+                                flag_case_a = True
+                            if np.sum(gt == kcls) > 0:
+                                flag_case_b = True
                     else:
                         for n_case in range(len(inp)):
-                            if np.sum(preds[n_case] == kcls) > 0:
+                            if np.sum(preds[n_case] == opt_kcls) > 0:
                                 flag_case_a = True
-                            if np.sum(gt[n_case] == kcls) > 0:
+                            if np.sum(gt[n_case] == opt_kcls) > 0:
                                 flag_case_b = True
 
                     if flag_case_a and flag_case_b:
@@ -367,11 +397,11 @@ class Solver(abc.ABC):
                                         bounds = [(1e-03,None)],
                                         tol = 1e-07)
                         
-                        optimized_param = optimization_result.x[0]
+                        optimized_param_ext = optimization_result.x[0]
 
                         if optimization_result.fun > search_threshold:
                             # change the initial state, if we are not satisfied with the optimization results.
-                            print(f"Not satisfied with initial optimization results of param_ext for class {kcls}, trying more initial states...")
+                            print(f"Not satisfied with initial optimization results of param_ext for class {opt_kcls}, trying more initial states...")
                             # change atc to be consistent with the range of confidence score
                             # get the max and min value here.
                             score = self.model.calibrate(inp, midstage = True)
@@ -406,9 +436,10 @@ class Solver(abc.ABC):
                                 print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
                             
                             print(results)
-                            optimized_param = min(results, key=lambda x: x[0])[1]
+                            optimized_param_ext = min(results, key=lambda x: x[0])[1]
 
-                    self.model.param_ext[kcls] = optimized_param
+                        for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
+                            self.model.param_ext[kcls] = optimized_param_ext
 
             else:
                 optimization_result = scipy.optimize.minimize(
@@ -418,7 +449,7 @@ class Solver(abc.ABC):
                                 bounds = [(1e-03,None)],
                                 tol = 1e-07)
 
-                optimized_param = optimization_result.x
+                optimized_param_ext = optimization_result.x
 
                 if optimization_result.fun > search_threshold:
                     # change the initial state, if we are not satisfied with the optimization results.
@@ -457,9 +488,9 @@ class Solver(abc.ABC):
                         cnt_guess += 1
                         print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
                     
-                    optimized_param = min(results, key=lambda x: x[0])[1]
+                    optimized_param_ext = min(results, key=lambda x: x[0])[1]
 
-                self.model.param_ext = optimized_param
+                self.model.param_ext = optimized_param_ext
 
         # I need save the normalization parameter, if the confidence needs to be normalized.
         _ = self.model.calibrate(self.inp)

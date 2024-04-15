@@ -11,7 +11,7 @@ except ImportError as e:
     # silently fail for now
     pass
 
-__version__ = "0.2.21"
+__version__ = "0.2.24"
 __all__ = ["MOVAL"]
 
 def __getattr__(key):

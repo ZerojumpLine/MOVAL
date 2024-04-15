@@ -65,13 +65,18 @@ class MOVAL(BaseEstimator):
     def fit(
         self,
         logits: Union[List[Iterable], np.ndarray],
-        gt: Union[List[Iterable], np.ndarray]
+        gt: Union[List[Iterable], np.ndarray], 
+        batch: int = 1
     ) -> "MOVAL":
         """Fit the estimator to the given dataset by minimzing the calibration error.
 
         Args:
             inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
             gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation.
+            batch: To match the group-wise accuracy with group-wise confidence score. batch is the group size. This is useful when validation data per case is few.
+        
+        Note:
+            It only makes sense if the class frequency is similar between class index to use ``batch`` > 1!
         
         Return:
             ``self``
@@ -186,7 +191,7 @@ class MOVAL(BaseEstimator):
                     model.param = np.ones(self.numclass) * model_pre.param
 
                 solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
-                solver.fit(logits, gt) # model fitting
+                solver.fit(logits, gt, batch) # model fitting
                 if self.metric == "precision" or self.metric == "auc":
                     probability_cond = model.calculate_probability(logits, appr = True, full = True) # ``(n, d)`` or a list of n ``(d, H, W, (D))``
                 else:
@@ -230,7 +235,7 @@ class MOVAL(BaseEstimator):
                 model.param = np.ones(self.numclass) * model_pre.param
 
             solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
-            solver.fit(logits, gt) # model fitting
+            solver.fit(logits, gt, batch) # model fitting
 
             # save the results to self attributes.
             self.model_ = model
