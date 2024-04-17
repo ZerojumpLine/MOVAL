@@ -435,7 +435,6 @@ class Solver(abc.ABC):
                                 cnt_guess += 1
                                 print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
                             
-                            print(results)
                             optimized_param_ext = min(results, key=lambda x: x[0])[1]
 
                         for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
@@ -456,10 +455,8 @@ class Solver(abc.ABC):
                     print(f"Not satisfied with initial optimization results of param_ext, trying more initial states...")
                     # change atc to be consistent with the range of confidence score
                     # get the max and min value here.
-                    score = self.model.calibrate(inp, midstage = True)
+                    score_ = self.model.calibrate(inp, midstage = True)
                     if self.model.mode == "classification":
-                        score_ = score[np.argmax(inp, axis = 1)]
-                        score_ = np.concatenate(score_)
                         initial_conditions_atc = [np.array([np.percentile(score_, 20)]), 
                                                     np.array([np.percentile(score_, 40)]), 
                                                     np.array([np.percentile(score_, 50)]), 
@@ -469,8 +466,7 @@ class Solver(abc.ABC):
                         score_ = []
                         for n_case in range(len(inp)):
                             score_flatten = score[n_case].flatten() # ``n``
-                            pred_flatten = np.argmax(inp[n_case], axis = 0).flatten()
-                            score_.append(score_flatten[pred_flatten])
+                            score_.append(score_flatten)
                         score_ = np.concatenate(score_)
                         initial_conditions_atc = [np.array([np.percentile(score_, 20)]), 
                                                     np.array([np.percentile(score_, 50)])]
