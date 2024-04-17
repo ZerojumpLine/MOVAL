@@ -37,7 +37,8 @@ def cal_energy(x: np.ndarray, T = 1) -> np.ndarray:
     """
 
     denominator = np.sum(np.exp(x.transpose() / T), axis=0)
-    energy = - T * np.log(denominator)
+    # energy = - T * np.log(denominator)
+    energy = - np.log(denominator)
 
     return energy
 
