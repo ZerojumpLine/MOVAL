@@ -309,7 +309,9 @@ class Solver(abc.ABC):
                         # change the initial state, if we are not satisfied with the optimization results.
                         print(f"Not satisfied with initial optimization results of param for class {opt_kcls}, trying more initial states...")
                         if self.model.estim_algorithm == "atc-model":
-                            score = self.model.calibrate(inp, midstage = True)
+                            score = self.model.conf(inp)
+                            if self.model.conf.normalization:
+                                score = self.model._normalize(score)
                             if self.model.mode == "classification":
                                 score_ = score[np.argmax(inp, axis = 1) == kcls]
                                 initial_conditions = [np.array([np.percentile(score_, 20)]), 
@@ -340,6 +342,7 @@ class Solver(abc.ABC):
                             cnt_guess += 1
                             print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
                         
+                        print(f"Starting from {initial_conditions}")
                         print(f"Optimization results are {results}")
 
                         optimized_param = min(results, key=lambda x: x[0])[1]
@@ -360,7 +363,9 @@ class Solver(abc.ABC):
                 # change the initial state, if we are not satisfied with the optimization results.
                 print(f"Not satisfied with initial optimization results of param, trying more initial states...")
                 if self.model.estim_algorithm == "atc-model":
-                    score = self.model.calibrate(inp)
+                    score = self.model.conf(inp)
+                    if self.model.conf.normalization:
+                        score = self.model._normalize(score)
                     if self.model.mode == "classification":
                         score_ = score
                         initial_conditions = [np.array([np.percentile(score_, 20)]), 
@@ -390,6 +395,7 @@ class Solver(abc.ABC):
                     cnt_guess += 1
                     print(f"Tried {cnt_guess}/{len(initial_conditions)} times.")
                 
+                print(f"Starting from {initial_conditions}")
                 print(f"Optimization results are {results}")
 
                 optimized_param = min(results, key=lambda x: x[0])[1]
@@ -468,6 +474,7 @@ class Solver(abc.ABC):
                                 cnt_guess += 1
                                 print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
                             
+                            print(f"Starting from {initial_conditions_atc}")
                             print(f"Optimization results are {results}")
 
                             optimized_param_ext = min(results, key=lambda x: x[0])[1]
@@ -520,6 +527,7 @@ class Solver(abc.ABC):
                         cnt_guess += 1
                         print(f"Tried {cnt_guess}/{len(initial_conditions_atc)} times.")
                     
+                    print(f"Starting from {initial_conditions_atc}")
                     print(f"Optimization results are {results}")
 
                     optimized_param_ext = min(results, key=lambda x: x[0])[1]

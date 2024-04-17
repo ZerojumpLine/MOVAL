@@ -671,19 +671,7 @@ class tsModel(Model):
 
         # Normalize the scores, if needed.
         if self.conf.normalization:
-            
-            if self.mode == "classification":
-                score = self._normalize(score)
-                # score is in range [0, 1], now we need to calibrate the confidence score with pseudo-temperature
-            elif self.mode == "segmentation":
-                preds = []
-                for n_case in range(len(score)):
-                    pred_case = np.argmax(inp[n_case], axis = 0)
-                    preds.append(pred_case)
-                score = self._normalize(score)
-                # score is in range [0, 1], now we need to calibrate the confidence score with pseudo-temperature
-            else:
-                raise ValueError(f"Unknown mode '{self.mode}'")
+            score = self._normalize(score)
         
         return score
 
@@ -872,17 +860,7 @@ class tsatcModel(Model):
         
         # Normalize the scores, if needed.
         if self.conf.normalization:
-            if self.mode == "classification":
-                pred = np.argmax(inp, axis = 1)
-                _score = self._normalize(_score)
-            elif self.mode == "segmentation":
-                preds = []
-                for n_case in range(len(_score)):
-                    pred_case = np.argmax(inp[n_case], axis = 0)
-                    preds.append(pred_case)
-                _score = self._normalize(_score)
-            else:
-                raise ValueError(f"Unknown mode '{self.mode}'") 
+            _score = self._normalize(_score)
 
         if midstage:
             return _score
