@@ -313,7 +313,9 @@ class Solver(abc.ABC):
                             if self.model.conf.normalization:
                                 score = self.model._normalize(score)
                             if self.model.mode == "classification":
-                                score_ = score[np.argmax(inp, axis = 1) == kcls]
+                                for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
+                                    score_.append(score[np.argmax(inp, axis = 1) == kcls])
+                                score_ = np.concatenate(score_)
                                 initial_conditions = [np.array([np.percentile(score_, 20)]), 
                                                       np.array([np.percentile(score_, 40)]), 
                                                       np.array([np.percentile(score_, 50)]), 
@@ -324,7 +326,7 @@ class Solver(abc.ABC):
                                 for n_case in range(len(inp)):
                                     score_flatten = score[n_case].flatten() # ``n``
                                     pred_flatten = np.argmax(inp[n_case], axis = 0).flatten()
-                                    score_.append(score_flatten[pred_flatten == kcls])
+                                    score_.append(score_flatten[pred_flatten == opt_kcls])
                                 score_ = np.concatenate(score_)
                                 initial_conditions = [np.array([np.percentile(score_, 20)]), 
                                                       np.array([np.percentile(score_, 50)])]
@@ -445,7 +447,9 @@ class Solver(abc.ABC):
                             # get the max and min value here.
                             score = self.model.calibrate(inp, midstage = True)
                             if self.model.mode == "classification":
-                                score_ = score[np.argmax(inp, axis = 1) == kcls]
+                                for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
+                                    score_.append(score[np.argmax(inp, axis = 1) == kcls])
+                                score_ = np.concatenate(score_)
                                 initial_conditions_atc = [np.array([np.percentile(score_, 20)]), 
                                                             np.array([np.percentile(score_, 40)]), 
                                                             np.array([np.percentile(score_, 50)]), 
@@ -456,7 +460,7 @@ class Solver(abc.ABC):
                                 for n_case in range(len(inp)):
                                     score_flatten = score[n_case].flatten() # ``n``
                                     pred_flatten = np.argmax(inp[n_case], axis = 0).flatten()
-                                    score_.append(score_flatten[pred_flatten == kcls])
+                                    score_.append(score_flatten[pred_flatten == opt_kcls])
                                 score_ = np.concatenate(score_)
                                 initial_conditions_atc = [np.array([np.percentile(score_, 20)]), 
                                                             np.array([np.percentile(score_, 50)])]
