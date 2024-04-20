@@ -242,7 +242,7 @@ class Solver(abc.ABC):
                 initial_conditions = [np.array([0.01]), np.array([0.1]), np.array([0.5]), np.array([1.5]), np.array([1.8])]
             else:
                 # the range of ts estimation is [0, inf].
-                initial_conditions = [np.array([0.01]), np.array([0.5]), np.array([3.]), np.array([5.]), np.array([10.])]
+                initial_conditions = [np.array([0.1]), np.array([0.5]), np.array([3.]), np.array([5.]), np.array([10.])]
             print(f"Opitimizing with {inp.shape[0]} samples...")
             
         else:
@@ -251,7 +251,7 @@ class Solver(abc.ABC):
                 initial_conditions = [np.array([0.01]), np.array([1.5])]
             else:
                 # the range of ts estimation is [0, inf].
-                initial_conditions = [np.array([0.01]), np.array([5])]
+                initial_conditions = [np.array([0.1]), np.array([5])]
 
             print(f"Opitimizing with {len(inp)} samples...")
             print("Be patient, it should take a while...")
