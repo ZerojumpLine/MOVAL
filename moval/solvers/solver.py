@@ -312,6 +312,7 @@ class Solver(abc.ABC):
                             score = self.model.conf(inp)
                             if self.model.conf.normalization:
                                 score = self.model._normalize(score)
+                            score_ = []
                             if self.model.mode == "classification":
                                 for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
                                     score_.append(score[np.argmax(inp, axis = 1) == kcls])
@@ -322,7 +323,6 @@ class Solver(abc.ABC):
                                                       np.array([np.percentile(score_, 60)]), 
                                                       np.array([np.percentile(score_, 80)])]
                             else:
-                                score_ = []
                                 for n_case in range(len(inp)):
                                     score_flatten = score[n_case].flatten() # ``n``
                                     pred_flatten = np.argmax(inp[n_case], axis = 0).flatten()
@@ -446,6 +446,7 @@ class Solver(abc.ABC):
                             # change atc to be consistent with the range of confidence score
                             # get the max and min value here.
                             score = self.model.calibrate(inp, midstage = True)
+                            score_ = []
                             if self.model.mode == "classification":
                                 for kcls in range(self.batch * opt_kcls, np.min((self.batch * (opt_kcls + 1), self.model.num_class))):
                                     score_.append(score[np.argmax(inp, axis = 1) == kcls])
@@ -456,7 +457,6 @@ class Solver(abc.ABC):
                                                             np.array([np.percentile(score_, 60)]), 
                                                             np.array([np.percentile(score_, 80)])]
                             else:
-                                score_ = []
                                 for n_case in range(len(inp)):
                                     score_flatten = score[n_case].flatten() # ``n``
                                     pred_flatten = np.argmax(inp[n_case], axis = 0).flatten()

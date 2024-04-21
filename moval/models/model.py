@@ -73,6 +73,7 @@ class Model(abc.ABC):
         self.conf = moval.models.init(self.confidence_scores)
         
         self.is_training = False
+        self.normalized = False
         
         # Note, for non-normalized method, we choose the parameter as the lower bound for normalization.
         if self.conf.normalization:
@@ -108,7 +109,7 @@ class Model(abc.ABC):
             scores: The unbounded confidence scores, of shape ``(n, )`` or a list of n ``(H, W, (D))``.
 
         Notes:
-            The intensity value, max and min value, will be saved.
+            The intensity value, max and min value, will be saved. This should be only done with the T = 1 (inital states).
         
         """
         if isinstance(scores, list):
@@ -139,9 +140,10 @@ class Model(abc.ABC):
         
         """
 
-        if self.is_training:
+        if self.is_training and not self.normalized:
             
             self._find_normalize(scores)
+            self.normalized = True
 
         if isinstance(scores, list):
             
