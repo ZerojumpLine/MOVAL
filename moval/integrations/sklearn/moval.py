@@ -176,19 +176,20 @@ class MOVAL(BaseEstimator):
                     class_specific = class_specific
                 )
 
-                if class_specific == True:
-                    # find a good initatlization, as other metrics would also depend on non-maximum logits
-                    # also find a good init for accuary of sensitivty, to handle the corner cases, where making no prediction for specific classes.
-                    model_pre = moval.models.init(
-                        estim_algorithm,
-                        mode = self.mode,
-                        num_class = self.numclass,
-                        confidence_scores = self.confidence_scores,
-                        class_specific = False
-                        )
-                    solver_pre = moval.solvers.init("base-solver", model = model_pre, metric = "accuracy")
-                    solver_pre.fit(logits, gt)
-                    model.param = np.ones(self.numclass) * model_pre.param
+                # Zeju Li, 16 May 2024: The leads to weird behaviour of precision estimation, skip it now.
+                # if class_specific == True:
+                #     # find a good initatlization, as other metrics would also depend on non-maximum logits
+                #     # also find a good init for accuary of sensitivty, to handle the corner cases, where making no prediction for specific classes.
+                #     model_pre = moval.models.init(
+                #         estim_algorithm,
+                #         mode = self.mode,
+                #         num_class = self.numclass,
+                #         confidence_scores = self.confidence_scores,
+                #         class_specific = False
+                #         )
+                #     solver_pre = moval.solvers.init("base-solver", model = model_pre, metric = "accuracy")
+                #     solver_pre.fit(logits, gt)
+                #     model.param = np.ones(self.numclass) * model_pre.param
 
                 solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
                 solver.fit(logits, gt, batch) # model fitting
@@ -220,19 +221,20 @@ class MOVAL(BaseEstimator):
                 class_specific = self.class_specific
                 )
             
-            if self.class_specific == True:
-                # find a good initatlization, as other metrics would also depend on non-maximum logits
-                # also find a good init for accuary of sensitivty, to handle the corner cases, where making no prediction for specific classes.
-                model_pre = moval.models.init(
-                    self.estim_algorithm,
-                    mode = self.mode,
-                    num_class = self.numclass,
-                    confidence_scores = self.confidence_scores,
-                    class_specific = False
-                    )
-                solver_pre = moval.solvers.init("base-solver", model = model_pre, metric = "accuracy")
-                solver_pre.fit(logits, gt)
-                model.param = np.ones(self.numclass) * model_pre.param
+            # Zeju Li, 16 May 2024: The leads to weird behaviour of precision estimation, skip it now.
+            # if self.class_specific == True:
+            #     # find a good initatlization, as other metrics would also depend on non-maximum logits
+            #     # also find a good init, to handle the corner cases, where making no prediction for specific classes.
+            #     model_pre = moval.models.init(
+            #         self.estim_algorithm,
+            #         mode = self.mode,
+            #         num_class = self.numclass,
+            #         confidence_scores = self.confidence_scores,
+            #         class_specific = False
+            #         )
+            #     solver_pre = moval.solvers.init("base-solver", model = model_pre, metric = "accuracy")
+            #     solver_pre.fit(logits, gt)
+            #     model.param = np.ones(self.numclass) * model_pre.param
 
             solver = moval.solvers.init("base-solver", model = model, metric = self.metric)
             solver.fit(logits, gt, batch) # model fitting

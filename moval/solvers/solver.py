@@ -145,7 +145,7 @@ class Solver(abc.ABC):
         return err
 
     def kcls_order_list(self, inp: np.ndarray, exclusive_background: bool = False) -> List[Iterable]:
-        """Generate a list of kcls, such that the predicted samples are in ascending order.
+        """Generate a list of kcls, such that the predicted samples are in descending order.
 
         Args:
             inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
@@ -171,7 +171,7 @@ class Solver(abc.ABC):
         if exclusive_background:
             kcls_list = kcls_list[:-1]
 
-        return kcls_list
+        return kcls_list[::-1]
 
     def fit(
         self,
@@ -260,8 +260,6 @@ class Solver(abc.ABC):
 
         # generate a list of length kcls, from high to low
         kcls_list = self.kcls_order_list(self.inp, exclusive_background)
-        if self.metric == "f1score":
-            kcls_list = kcls_list[::-1]
 
         if self.class_specific:
             
