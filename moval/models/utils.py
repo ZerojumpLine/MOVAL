@@ -178,7 +178,7 @@ def SoftSensitivity(x: np.ndarray, y: np.ndarray, smooth = 1e-5) -> np.ndarray:
         y: The manual label of shape ``(n, (H), (W), (D))``.
     
     Returns:
-        dice_score: Average class-wise dice of shape ``(d, )``
+        sensitivity_score: Average class-wise sensitivity of shape ``(d, )``
 
     """
     assert len(x.shape) == len(y.shape) + 1
@@ -200,7 +200,7 @@ def SoftPrecision(x: np.ndarray, y: np.ndarray, smooth = 1e-5) -> np.ndarray:
         y: The manual label of shape ``(n, (H), (W), (D))``.
     
     Returns:
-        dice_score: Average class-wise dice of shape ``(d, )``
+        precision_score: Average class-wise precision of shape ``(d, )``
 
     """
     assert len(x.shape) == len(y.shape) + 1

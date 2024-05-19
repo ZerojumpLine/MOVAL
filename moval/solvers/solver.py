@@ -152,7 +152,7 @@ class Solver(abc.ABC):
             exclusive_background: If ``False``, we exclude the background class (the most majority class).
         
         Return:
-            kcls_list: a list of class index. The first element should correspond to the most minority class.
+            kcls_list: a list of class index. The first element should correspond to the most major class.
 
         """
         kcls_sample = np.zeros(self.opt_class)
@@ -260,6 +260,9 @@ class Solver(abc.ABC):
 
         # generate a list of length kcls, from high to low
         kcls_list = self.kcls_order_list(self.inp, exclusive_background)
+        if self.metric == "auc" or self.metric == "precision":
+            # these two largely depends on FP, threfore we optimize from the minority class
+            kcls_list = kcls_list[::-1]
 
         if self.class_specific:
             
