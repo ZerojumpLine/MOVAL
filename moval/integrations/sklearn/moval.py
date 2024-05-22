@@ -160,6 +160,68 @@ class MOVAL(BaseEstimator):
             moval_models = []
             moval_models.append(["ts-model", self.mode, "energy-conf", True])
             moval_models.append(["doc-model", self.mode, "max_class_probability-conf", False])
+        # classification policy here
+        elif self.estim_algorithm == "moval-ensemble-cls-accuracy":
+            # ensenble strategies for accuracy estimation of classification
+            moval_models = []
+            moval_models.append(["ts-atc-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["ts-atc-model", self.mode, "entropy-conf", True])
+            moval_models.append(["atc-model", self.mode, "energy-conf", True])
+        elif self.estim_algorithm == "moval-ensemble-cls-f1score":
+            # ensenble strategies for f1score estimation of classification
+            moval_models = []
+            moval_models.append(["ts-atc-model", self.mode, "doctor-conf", True])
+            moval_models.append(["atc-model", self.mode, "entropy-conf", True])
+            moval_models.append(["atc-model", self.mode, "max_class_probability-conf", True])
+        elif self.estim_algorithm == "moval-ensemble-cls-sensitivity":
+            # ensenble strategies for sensitivity estimation of classification
+            moval_models = []
+            moval_models.append(["ts-atc-model", self.mode, "doctor-conf", True])
+            moval_models.append(["atc-model", self.mode, "entropy-conf", True])
+            moval_models.append(["atc-model", self.mode, "max_class_probability-conf", True])
+        elif self.estim_algorithm == "moval-ensemble-cls-precision":
+            # ensenble strategies for precision estimation of classification
+            moval_models = []
+            moval_models.append(["ts-model", self.mode, "entropy-conf", True])
+            moval_models.append(["doc-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["doc-model", self.mode, "entropy-conf", True])
+        elif self.estim_algorithm == "moval-ensemble-cls-auc":
+            # ensenble strategies for auc estimation of classification
+            moval_models = []
+            moval_models.append(["ts-model", self.mode, "energy-conf", False])
+            moval_models.append(["ts-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["doc-model", self.mode, "energy-conf", True])
+        # segmentation policy here
+        elif self.estim_algorithm == "moval-ensemble-seg-accuracy":
+            # ensenble strategies for accuracy estimation of segmentation
+            moval_models = []
+            moval_models.append(["ts-model", self.mode, "max_class_probability-conf", False])
+            moval_models.append(["ts-atc-model", self.mode, "max_class_probability-conf", False])
+            moval_models.append(["atc-model", self.mode, "max_class_probability-conf", False])
+        elif self.estim_algorithm == "moval-ensemble-seg-f1score":
+            # ensenble strategies for f1score estimation of segmentation
+            moval_models = []
+            moval_models.append(["atc-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["ts-model", self.mode, "entropy-conf", True])
+            moval_models.append(["ts-atc-model", self.mode, "energy-conf", True])
+        elif self.estim_algorithm == "moval-ensemble-seg-sensitivity":
+            # ensenble strategies for sensitivity estimation of segmentation
+            moval_models = []
+            moval_models.append(["atc-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["ts-model", self.mode, "entropy-conf", True])
+            moval_models.append(["ts-atc-model", self.mode, "energy-conf", True])
+        elif self.estim_algorithm == "moval-ensemble-seg-precision":
+            # ensenble strategies for precision estimation of segmentation
+            moval_models = []
+            moval_models.append(["ts-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["doc-model", self.mode, "entropy-conf", True])
+            moval_models.append(["doc-model", self.mode, "doctor-conf", True])
+        elif self.estim_algorithm == "moval-ensemble-seg-auc":
+            # ensenble strategies for auc estimation of segmentation
+            moval_models = []
+            moval_models.append(["ts-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["ts-model", self.mode, "entropy-conf", True])
+            moval_models.append(["doc-model", self.mode, "max_class_probability-conf", True])
 
 
         if self.ensemble:
@@ -239,7 +301,11 @@ class MOVAL(BaseEstimator):
             self.model_ = model
             self.solver_ = solver
             print(f"Calculating and saving the fitted case-wise performance...")
-            self.fitted_perf = self.get_case_perf(model, self.metric, logits, gt)
+            if self.metric == "precision" or self.metric == "auc":
+                probability = model.calculate_probability(logits, appr = True, full=True)
+            else:
+                probability = model.calculate_probability(logits, appr = True)
+            self.fitted_perf = self.get_case_perf(model, self.metric, logits, probability, gt)
 
         if self.mode == "classification":
             self.n_dim_ = len(logits.shape)
@@ -261,17 +327,17 @@ class MOVAL(BaseEstimator):
             probability_agg: The average probability of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
 
         """
-        if len(probabilities[0].shape) == 2:
-            # classification
-            probability_agg = np.mean(np.array(probabilities), axis = 0)
-        else:
+        if isinstance(probabilities[0], list):
             # segmentation
             probability_agg = []
-            for n_case in len(probabilities[0]):
-                for k_cond in len(probabilities):
+            for n_case in range(len(probabilities[0])):
+                for k_cond in range(len(probabilities)):
                     probabilities_case = []
                     probabilities_case.append(probabilities[k_cond][n_case])
-                probability_agg.append(np.mean(np.array(probabilities_case)), axis = 0)
+                probability_agg.append(np.mean(np.array(probabilities_case), axis = 0))
+        else:
+            # classification
+            probability_agg = np.mean(np.array(probabilities), axis = 0)
         
         return probability_agg
 
@@ -280,6 +346,7 @@ class MOVAL(BaseEstimator):
                       model: moval.models,
                       metric: str,
                       inp: Union[List[Iterable], np.ndarray],
+                      probability: Union[List[Iterable], np.ndarray],
                       gt: Union[List[Iterable], np.ndarray]):
         """Store the estimated results of n fitted data.
 
@@ -289,7 +356,8 @@ class MOVAL(BaseEstimator):
         Args:
             model: The fitted moval model.
             metric: The performance metric to follow.
-            inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation. 
+            inp: The network output (logits) of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation.
+            probability: The calculated probability of shape ``(n, d)`` for classification and a list of n ``(d, H, W, (D))`` for segmentation.
             gt: The cooresponding annotation of shape ``(n, )`` for classification and a list of n ``(H, W, (D))`` for segmentation.
 
         Returns:
@@ -298,11 +366,6 @@ class MOVAL(BaseEstimator):
         """
 
         fitted_perf = []
-        
-        if metric == "precision" or metric == "auc":
-            probability = model.calculate_probability(inp, appr = True, full=True)
-        else:
-            probability = model.calculate_probability(inp, appr = True)
 
         if model.mode == "classification":
             
