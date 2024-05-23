@@ -170,7 +170,7 @@ class MOVAL(BaseEstimator):
         elif self.estim_algorithm == "moval-ensemble-cls-f1score":
             # ensenble strategies for f1score estimation of classification
             moval_models = []
-            moval_models.append(["ts-atc-model", self.mode, "doctor-conf", True])
+            moval_models.append(["ts-atc-model", self.mode, "max_class_probability-conf", True])
             moval_models.append(["atc-model", self.mode, "entropy-conf", True])
             moval_models.append(["atc-model", self.mode, "max_class_probability-conf", True])
         elif self.estim_algorithm == "moval-ensemble-cls-sensitivity":
@@ -331,8 +331,8 @@ class MOVAL(BaseEstimator):
             # segmentation
             probability_agg = []
             for n_case in range(len(probabilities[0])):
+                probabilities_case = []
                 for k_cond in range(len(probabilities)):
-                    probabilities_case = []
                     probabilities_case.append(probabilities[k_cond][n_case])
                 probability_agg.append(np.mean(np.array(probabilities_case), axis = 0))
         else:
