@@ -195,14 +195,14 @@ class MOVAL(BaseEstimator):
         elif self.estim_algorithm == "moval-ensemble-seg2d-accuracy":
             # ensenble strategies for accuracy estimation of segmentation
             moval_models = []
+            moval_models.append(["atc-model", self.mode, "max_class_probability-conf", False])
+            moval_models.append(["doc-model", self.mode, "entropy-conf", True])
             moval_models.append(["ts-model", self.mode, "max_class_probability-conf", True])
-            moval_models.append(["ts-model", self.mode, "max_class_probability-conf", False])
-            moval_models.append(["doc-model", self.mode, "doctor-conf", False])
         elif self.estim_algorithm == "moval-ensemble-seg2d-f1score":
             # ensenble strategies for f1score estimation of segmentation
             moval_models = []
             moval_models.append(["doc-model", self.mode, "entropy-conf", True])
-            moval_models.append(["ts-model", self.mode, "doctor-conf", True])
+            moval_models.append(["doc-model", self.mode, "doctor-conf", True])
             moval_models.append(["atc-model", self.mode, "max_class_probability-conf", True])
         elif self.estim_algorithm == "moval-ensemble-seg2d-sensitivity":
             # ensenble strategies for sensitivity estimation of segmentation
@@ -227,8 +227,8 @@ class MOVAL(BaseEstimator):
             # ensenble strategies for accuracy estimation of segmentation
             moval_models = []
             moval_models.append(["ts-model", self.mode, "max_class_probability-conf", False])
-            moval_models.append(["ts-atc-model", self.mode, "max_class_probability-conf", False])
-            moval_models.append(["atc-model", self.mode, "max_class_probability-conf", False])
+            moval_models.append(["ts-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["doc-model", self.mode, "doctor-conf", True])
         elif self.estim_algorithm == "moval-ensemble-seg3d-f1score":
             # ensenble strategies for f1score estimation of segmentation
             moval_models = []
@@ -245,8 +245,8 @@ class MOVAL(BaseEstimator):
             # ensenble strategies for precision estimation of segmentation
             moval_models = []
             moval_models.append(["ts-model", self.mode, "max_class_probability-conf", True])
-            moval_models.append(["doc-model", self.mode, "entropy-conf", True])
-            moval_models.append(["doc-model", self.mode, "doctor-conf", True])
+            moval_models.append(["doc-model", self.mode, "max_class_probability-conf", True])
+            moval_models.append(["ts-model", self.mode, "doctor-conf", False])
         elif self.estim_algorithm == "moval-ensemble-seg3d-auc":
             # ensenble strategies for auc estimation of segmentation
             moval_models = []
